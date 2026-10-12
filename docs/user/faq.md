@@ -64,9 +64,11 @@ tells it how it measures them. See [terminals](../terminals.md).
 
 Desktop notifications need a notification daemon (most desktops have
 one; on a window manager, install `dunst` or `mako`) and a D-Bus session.
-They appear only while the terminal does not have focus, which needs
-focus reporting (in tmux: `set -g focus-events on`), and never for muted
-chats or old messages. Without a daemon, for example over SSH, tarcin
+By default they appear only while the terminal does not have focus,
+which needs focus reporting (in tmux: `set -g focus-events on`); set
+`when = "other-chats"` under `[notifications]` to get them while you
+use the terminal too, for the chats you are not reading. They never
+appear for muted chats or old messages. Without a daemon, for example over SSH, tarcin
 rings the terminal bell instead.
 
 ## Where do I report a bug?

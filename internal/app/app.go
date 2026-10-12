@@ -187,7 +187,7 @@ func newSession(b backend.Backend, pipe *pipeline, set *settings, dataDir string
 		set = &settings{}
 	}
 	s.model = ui.New(ui.Options{
-		Theme: set.theme, Keymap: set.keymap, History: pipe.reader, Members: pipe.reader, Search: pipe.reader, Older: pipe.older(), React: pipe.react(), Edit: pipe.edit(), Delete: pipe.revoke(), Mentionable: pipe.mentionable, Typing: pipe.typing(), Presence: pipe.presence(), Notify: set.notify, ChatSetting: pipe.chatSetting(), DeleteLocal: pipe.deleteLocal(),
+		Theme: set.theme, Keymap: set.keymap, History: pipe.reader, Members: pipe.reader, Search: pipe.reader, Older: pipe.older(), React: pipe.react(), Edit: pipe.edit(), Delete: pipe.revoke(), Mentionable: pipe.mentionable, Typing: pipe.typing(), Presence: pipe.presence(), Notify: set.notify, NotifyFocused: set.cfg.Notify.When == "other-chats", ChatSetting: pipe.chatSetting(), DeleteLocal: pipe.deleteLocal(),
 		Metrics: pipe.metrics(func() (int, int) {
 			if b := s.bridge.Load(); b != nil {
 				return b.Stats()

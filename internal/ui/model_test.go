@@ -765,6 +765,16 @@ func TestNotifications(t *testing.T) {
 	if len(got) != 0 {
 		t.Fatal("own messages never notify")
 	}
+
+	// notifications.when = "other-chats": a focused terminal notifies for
+	// every chat but the open one.
+	m.notifyFocused = true
+	m.Update(tea.FocusMsg{})
+	got = nil
+	m.Update(BatchMsg{Appends: map[domain.ChatID][]domain.Message{1: {msg(1, 11, "open", 0, true)}, 2: {msg(2, 12, "other", 0, true)}}})
+	if len(got) != 1 || got[0].Chat != 2 {
+		t.Fatalf("notifications = %+v, want only the chat that is not open", got)
+	}
 }
 
 func TestAttentionFollowsTerminalFocus(t *testing.T) {

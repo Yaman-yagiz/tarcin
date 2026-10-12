@@ -72,12 +72,16 @@ delete.
 
 ```toml
 [notifications]
-enabled = true    # a notification for new messages while the terminal is not focused
-preview = false   # say who wrote, not what
+enabled = true        # a notification for new messages
+when = "other-chats"  # also while the terminal has focus, for the chats you are not reading
+preview = false       # say who wrote, not what
 ```
 
-tarcin notifies only for live messages in chats that are not muted,
-while the terminal does not have focus, one notification per chat.
+tarcin notifies only for live messages in chats that are not muted, one
+notification per chat. By default (`when = "unfocused"`) it does so
+only while the terminal does not have focus, since you see new messages
+in tarcin itself otherwise. With `when = "other-chats"` it also
+notifies while the terminal has focus, for every chat but the open one.
 Without a notification daemon it rings the terminal bell.
 
 ## Keys

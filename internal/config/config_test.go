@@ -34,6 +34,9 @@ theme = "plain"
 [log]
 level = "debug"
 
+[notifications]
+when = "other-chats"
+
 [keys.messages]
 reply = ["R", "ctrl+r"]
 delete = []
@@ -41,7 +44,7 @@ delete = []
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Privacy.ReadReceipts || c.UI.Theme != "plain" || c.LogLevel() != slog.LevelDebug {
+	if c.Privacy.ReadReceipts || c.UI.Theme != "plain" || c.LogLevel() != slog.LevelDebug || c.Notify.When != "other-chats" || !c.Notify.Enabled {
 		t.Fatalf("config = %+v", c)
 	}
 	if got := c.Keys["messages"]; !reflect.DeepEqual(got, map[string][]string{"reply": {"R", "ctrl+r"}, "delete": {}}) {
@@ -49,7 +52,7 @@ delete = []
 	}
 	// A file that sets only some keys keeps the other defaults.
 	c, err = Parse("config.toml", []byte("[log]\nlevel = \"warn\"\n"))
-	if err != nil || !c.Privacy.ReadReceipts || c.UI.Theme != "auto" || c.LogLevel() != slog.LevelWarn {
+	if err != nil || !c.Privacy.ReadReceipts || c.UI.Theme != "auto" || c.LogLevel() != slog.LevelWarn || c.Notify.When != "unfocused" {
 		t.Fatalf("partial config = %+v, %v", c, err)
 	}
 }
@@ -64,6 +67,7 @@ func TestParseErrorsNameFileLineAndKey(t *testing.T) {
 		{"syntax", "[ui]\ntheme = plain\n", "config.toml:2: "},
 		{"bad theme", "[ui]\n\ntheme = \"neon\"\n", `config.toml:3: ui.theme: "neon" is not a theme (want one of "auto", "default", "plain", "high-contrast")`},
 		{"bad level", "[log]\nlevel = \"verbose\"\n", `config.toml:2: log.level: "verbose" is not a level`},
+		{"bad when", "[notifications]\nwhen = \"always\"\n", `config.toml:2: notifications.when: "always" is not a choice (want one of "unfocused", "other-chats")`},
 		{"keys shape", "[keys]\nquit = \"ctrl+q\"\n", "config.toml:2: keys.quit: must be a table of actions"},
 		{"binding shape", "[keys.global]\nquit = \"ctrl+q\"\n", "config.toml:2: keys.global.quit: incompatible types"},
 		{"binding type", "[keys.global]\nquit = [1]\n", "config.toml:2: keys.global.quit: incompatible types"},
@@ -131,7 +135,7 @@ func TestWriteReadsBack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, buf.String())
 	}
-	if c.Privacy != def.Privacy || c.UI != def.UI || c.Log != def.Log {
+	if c.Privacy != def.Privacy || c.UI != def.UI || c.Log != def.Log || c.Notify != def.Notify {
 		t.Fatalf("read back %+v", c)
 	}
 	want := map[string]map[string][]string{

@@ -91,6 +91,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Storage and load benchmarks for the performance budgets
   (`make storagebench`, `make loadtest`).
 
+### Changed
+
+- `notifications.when = "other-chats"` notifies while the terminal has
+  focus too, for every chat but the open one. The default, `"unfocused"`,
+  keeps notifying only while the terminal does not have focus.
+
 ### Fixed
 
 - The open chat no longer marks new messages read, or sends read

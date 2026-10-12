@@ -87,11 +87,15 @@ func Write(w io.Writer, c *Config, keys []KeyContext) error {
 	}
 	b.WriteString(`
 [notifications]
-# A desktop notification for each new message while the terminal does
-# not have focus: not for muted chats, history or a backlog. Without a
-# desktop session the terminal bell rings instead.
+# A desktop notification for each new message, not for muted chats,
+# history or a backlog. Without a desktop session the terminal bell rings
+# instead.
 `)
 	fmt.Fprintf(&b, "enabled = %t\n", c.Notify.Enabled)
+	b.WriteString(`# When to notify: "unfocused", only while the terminal does not have
+# focus; "other-chats", also while it has, for every chat but the open one.
+`)
+	fmt.Fprintf(&b, "when = %s\n", tomlString(c.Notify.When))
 	b.WriteString(`# Show the message's text in the notification; off, only who wrote.
 `)
 	fmt.Fprintf(&b, "preview = %t\n", c.Notify.Preview)

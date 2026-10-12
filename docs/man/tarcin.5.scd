@@ -88,9 +88,14 @@ and comments; *tarcin config check* validates the file.
 *[notifications]*
 
 *enabled* = _true_
-	A desktop notification for each new message while the terminal does
-	not have focus: not for muted chats, history or a backlog. Without a
-	desktop session the terminal bell rings instead.
+	A desktop notification for each new message, not for muted chats,
+	history or a backlog. Without a desktop session the terminal bell
+	rings instead.
+
+*when* = _"unfocused"_
+	When to notify: *"unfocused"*, only while the terminal does not have
+	focus; *"other-chats"*, also while it has, for every chat but the
+	open one.
 
 *preview* = _true_
 	Show the message's text in the notification; off, only who wrote.

@@ -70,13 +70,20 @@ type Media struct {
 
 // Notify holds the settings of desktop notifications.
 type Notify struct {
-	// Enabled shows a notification for a new message while the terminal
-	// does not have focus, or rings the bell without a desktop.
+	// Enabled shows a notification for a new message, or rings the bell
+	// without a desktop.
 	Enabled bool `toml:"enabled"`
+	// When is when a new message notifies: one of NotifyWhens.
+	When string `toml:"when"`
 	// Preview puts the message's text in the notification; off, it says
 	// only who wrote.
 	Preview bool `toml:"preview"`
 }
+
+// NotifyWhens are the values of notifications.when: "unfocused" notifies
+// only while the terminal does not have focus; "other-chats" also while
+// it has, for every chat but the open one.
+var NotifyWhens = []string{"unfocused", "other-chats"}
 
 // UI holds the interface's settings.
 type UI struct {
@@ -101,7 +108,7 @@ func Default() Config {
 		Privacy: Privacy{ReadReceipts: true, Typing: true, Presence: true},
 		UI:      UI{Theme: "auto"},
 		Media:   Media{MaxDownloadMiB: 100, MaxUploadMiB: 100, CacheMiB: 2048, Open: []string{"xdg-open"}},
-		Notify:  Notify{Enabled: true, Preview: true},
+		Notify:  Notify{Enabled: true, When: "unfocused", Preview: true},
 		Log:     Log{Level: "info"},
 	}
 }
@@ -198,6 +205,9 @@ func Parse(path string, data []byte) (Config, error) {
 	}
 	if !slices.Contains(Levels, c.Log.Level) {
 		return Config{}, c.errorf("log.level", "%q is not a level (want one of %s)", c.Log.Level, quoted(Levels))
+	}
+	if !slices.Contains(NotifyWhens, c.Notify.When) {
+		return Config{}, c.errorf("notifications.when", "%q is not a choice (want one of %s)", c.Notify.When, quoted(NotifyWhens))
 	}
 	if err := c.checkMedia(); err != nil {
 		return Config{}, err

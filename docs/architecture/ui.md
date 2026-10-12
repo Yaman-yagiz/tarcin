@@ -253,8 +253,9 @@ keyboard protocol; the other newline bindings work on legacy terminals.
 - Long messages open in `$PAGER` the same way.
 - Notifications go over D-Bus (see [packaging](packaging.md) §4,
   `internal/notify`). They are skipped when the terminal has focus
-  (focus reporting, DECSET 1004), and while focus is unknown for the open
-  chat; for muted chats; for history (only live, unread messages from
+  (focus reporting, DECSET 1004), unless `notifications.when` is
+  `"other-chats"`; the open chat notifies only while the terminal is
+  known to lack focus; for muted chats; for history (only live, unread messages from
   others notify) and for a backlog (messages more than two minutes old,
   delivered after tarcin was offline). One notification per chat, the
   newest replacing the last. `[notifications] preview = false` leaves the

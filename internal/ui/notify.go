@@ -50,16 +50,17 @@ func (m *Model) setTermFocus(f int8) tea.Cmd {
 
 // notifications returns the commands that notify about a batch's new
 // messages: only live, unread, recent messages from others, in chats that
-// are not muted, and only while the terminal does not have focus. While
-// focus is unknown, the open chat does not notify.
+// are not muted, and only while the terminal does not have focus, or with
+// NotifyFocused also while it has. The open chat notifies only while the
+// terminal is known to lack focus.
 func (m *Model) notifications(b BatchMsg) tea.Cmd {
-	if m.notifyFn == nil || m.termFocus == focusIn {
+	if m.notifyFn == nil || (m.termFocus == focusIn && !m.notifyFocused) {
 		return nil
 	}
 	now := m.now()
 	var cmds []tea.Cmd
 	for chat, msgs := range b.Appends {
-		if m.chats.IsMuted(chat) || (m.termFocus == focusUnknown && chat == m.msgs.Chat()) {
+		if m.chats.IsMuted(chat) || (m.termFocus != focusOut && chat == m.msgs.Chat()) {
 			continue
 		}
 		var latest *domain.Message

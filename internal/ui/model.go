@@ -87,6 +87,9 @@ type Options struct {
 	// Notify shows a desktop notification, or rings the bell; it returns
 	// the command that does so. Nil: no notifications.
 	Notify func(n Notification) tea.Cmd
+	// NotifyFocused notifies while the terminal has focus too, for every
+	// chat but the open one. False: only while it does not.
+	NotifyFocused bool
 	// Attach queues a file to send to a chat, with out's text as its
 	// caption; it returns the command that does so, which reports an
 	// AttachResultMsg. Nil disables it.
@@ -187,6 +190,7 @@ type Model struct {
 	confirmFn                func() tea.Cmd
 	termFocus                int8
 	attentionFn              func(bool) tea.Cmd
+	notifyFocused            bool
 	saveMediaFn              func(domain.Message) tea.Cmd
 	presenceFn               func(bool) tea.Cmd
 	available                bool
@@ -288,6 +292,7 @@ func New(opts Options) *Model {
 		attachFn:       opts.Attach,
 		notifyFn:       opts.Notify,
 		attentionFn:    opts.Attention,
+		notifyFocused:  opts.NotifyFocused,
 		settingFn:      opts.ChatSetting,
 		deleteLocalFn:  opts.DeleteLocal,
 		metricsFn:      opts.Metrics,
