@@ -708,7 +708,9 @@ func TestGroupRefresh(t *testing.T) {
 	if len(page) != 4 || page[0].Identity == 0 {
 		t.Fatalf("members = %+v", page)
 	}
-	// A member change to a stale group fetches it in full.
+	// A member change to a stale group fetches it in full. It must not
+	// join the first fetch while that one is still finishing.
+	waitUntil(t, "the first fetch to finish", func() bool { return p.jobs.Stats().InFlight == 0 })
 	later(25 * time.Hour)
 	if err := p.Deliver(t.Context(), []domain.Event{domain.GroupMembersChanged{ChatJID: g.JID, Left: []domain.JID{"999@lid"}}}); err != nil {
 		t.Fatal(err)

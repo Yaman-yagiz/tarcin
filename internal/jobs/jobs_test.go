@@ -251,3 +251,28 @@ func waitFor(t *testing.T, cond func() bool) {
 		time.Sleep(time.Millisecond)
 	}
 }
+
+// TestInFlightCountsJoinableJobs: a job counts until it has finished, so
+// a caller can tell when a new submission would start afresh.
+func TestInFlightCountsJoinableJobs(t *testing.T) {
+	p := New(Options{Workers: 1, Backoff: fast})
+	defer p.Close()
+	release := make(chan struct{})
+	if err := p.Submit("k", func(context.Context) error { <-release; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if n := p.Stats().InFlight; n != 1 {
+		t.Fatalf("InFlight = %d while the job runs, want 1", n)
+	}
+	close(release)
+	deadline := time.Now().Add(5 * time.Second)
+	for p.Stats().Done != 1 {
+		if time.Now().After(deadline) {
+			t.Fatal("the job did not finish")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if n := p.Stats().InFlight; n != 0 {
+		t.Fatalf("InFlight = %d after the job finished, want 0", n)
+	}
+}

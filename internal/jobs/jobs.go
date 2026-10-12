@@ -96,6 +96,9 @@ func (b Backoff) Delay(attempt int) time.Duration {
 // Stats are a pool's counters.
 type Stats struct {
 	Queued, Running int
+	// InFlight counts the keys a new submission would join: the jobs
+	// queued, running or finishing.
+	InFlight int
 	// Done and Failed count finished jobs; Retried counts attempts after
 	// the first; Shared counts submissions that joined a job with the
 	// same key; Dropped counts submissions refused for a full queue.
@@ -295,8 +298,11 @@ func (p *Pool) finish(f *flight, err error) {
 
 // Stats returns the pool's counters.
 func (p *Pool) Stats() Stats {
+	p.mu.Lock()
+	inFlight := len(p.flights)
+	p.mu.Unlock()
 	return Stats{
-		Queued: len(p.queue), Running: int(p.running.Load()),
+		Queued: len(p.queue), Running: int(p.running.Load()), InFlight: inFlight,
 		Done: p.done.Load(), Failed: p.failed.Load(), Retried: p.retried.Load(),
 		Shared: p.shared.Load(), Dropped: p.dropped.Load(),
 	}
