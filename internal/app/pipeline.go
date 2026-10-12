@@ -99,6 +99,7 @@ type pipeline struct {
 	expireStop chan struct{}
 
 	open atomic.Int64 // the chat the user is reading, for marking new messages read
+	away atomic.Bool  // the terminal lost focus: the open chat's new messages stay unread
 	// typingMu guards typingEnd: the timers that hide a typing indicator
 	// whose end never arrived.
 	typingMu  sync.Mutex
@@ -642,7 +643,7 @@ func (p *pipeline) publish(c *store.Changes) {
 // readOpenChat marks new messages of the chat on screen as read.
 func (p *pipeline) readOpenChat(ctx context.Context, c *store.Changes) {
 	open := domain.ChatID(p.open.Load())
-	if open == 0 {
+	if open == 0 || p.away.Load() {
 		return
 	}
 	at := p.clock.Now()
@@ -753,8 +754,29 @@ func (p *pipeline) sendReadReceipts(ctx context.Context, chat domain.JID, unread
 	}
 }
 
+// attention is the ui.Options.Attention function. While the user is away
+// (the terminal lost focus), the open chat's new messages stay unread and
+// send no read receipts; when the user is back, the chat is read, as the
+// official clients do when their window gets focus again.
+func (p *pipeline) attention(watching bool) tea.Cmd {
+	p.away.Store(!watching)
+	chat := domain.ChatID(p.open.Load())
+	if !watching || chat == 0 {
+		return nil
+	}
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := p.markRead(ctx, chat, p.clock.Now()); err != nil {
+			return composer.ErrorMsg{Err: fmt.Errorf("marking the chat read: %w", err)}
+		}
+		return nil
+	}
+}
+
 // read returns the ui.Options.Read function: the chat is read now, and
-// its new messages are read as they arrive while it stays open.
+// its new messages are read as they arrive while it stays open and the
+// user is not away.
 func (p *pipeline) read(chat domain.ChatID) tea.Cmd {
 	p.open.Store(int64(chat))
 	return func() tea.Msg {

@@ -259,6 +259,8 @@ keyboard protocol; the other newline bindings work on legacy terminals.
   delivered after tarcin was offline). One notification per chat, the
   newest replacing the last. `[notifications] preview = false` leaves the
   text out. Without a notification service, the terminal bell rings.
+  While the terminal lacks focus, the open chat's new messages also stay
+  unread (see [event pipeline](event-pipeline.md)).
 
 ## 7. Terminal-safe rendering
 

@@ -299,8 +299,11 @@ The bridge is the boundary between backend speed and UI speed.
       of messages are refused before anything is stored. A retry forwards
       the stored copy again.
 - **Mark as read:** opening a chat, and each new message while it stays
-  open, records a `ChatRead` at once. If the privacy setting
-  `send_read_receipts` is on, the unread incoming messages (from the
+  open, records a `ChatRead` at once. While the terminal lacks focus
+  (focus reporting, DECSET 1004), the open chat's new messages stay
+  unread, as in the official clients; the chat is read when focus
+  returns, or at the next key press. If the privacy setting
+  `privacy.read_receipts` is on, the unread incoming messages (from the
   per-message unread flag) are then reported to their senders, one
   request per sender as groups require, off the UI goroutine. While
   offline, the receipts are not sent; only the other side's ticks miss

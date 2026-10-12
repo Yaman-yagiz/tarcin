@@ -41,6 +41,11 @@ type Options struct {
 	// Read marks a chat as read when the user opens it; it returns the
 	// command that does so. Nil disables it.
 	Read func(chat domain.ChatID) tea.Cmd
+	// Attention reports whether the user can see the open chat: false
+	// when the terminal loses focus, true when it gets it back. While it
+	// is false, the open chat's new messages stay unread. It returns the
+	// command that does so. Nil disables it.
+	Attention func(watching bool) tea.Cmd
 	// Retry sends a failed own message again; it returns the command that
 	// does so. Nil disables it.
 	Retry func(msg domain.Message) tea.Cmd
@@ -181,6 +186,7 @@ type Model struct {
 	confirmText              string
 	confirmFn                func() tea.Cmd
 	termFocus                int8
+	attentionFn              func(bool) tea.Cmd
 	saveMediaFn              func(domain.Message) tea.Cmd
 	presenceFn               func(bool) tea.Cmd
 	available                bool
@@ -281,6 +287,7 @@ func New(opts Options) *Model {
 		openMediaFn:    opts.OpenMedia,
 		attachFn:       opts.Attach,
 		notifyFn:       opts.Notify,
+		attentionFn:    opts.Attention,
 		settingFn:      opts.ChatSetting,
 		deleteLocalFn:  opts.DeleteLocal,
 		metricsFn:      opts.Metrics,
@@ -355,16 +362,22 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.KeyPressMsg:
+		// A key press means the user is back, even if the terminal never
+		// reported getting focus again. Unknown focus stays unknown, so
+		// that terminals without focus reporting keep their notifications.
+		var back tea.Cmd
+		if m.termFocus == focusOut {
+			back = m.setTermFocus(focusIn)
+		}
 		before := m.comp.Value()
 		cmd := m.handleKey(msg)
-		return m, tea.Batch(cmd, m.active(), m.typed(before))
+		return m, tea.Batch(back, cmd, m.active(), m.typed(before))
 	case tea.BlurMsg:
-		m.termFocus = focusOut
-		cmd := m.goOffline()
-		return m, cmd
+		cmd := m.setTermFocus(focusOut)
+		return m, tea.Batch(cmd, m.goOffline())
 	case tea.FocusMsg:
-		m.termFocus = focusIn
-		return m, nil
+		cmd := m.setTermFocus(focusIn)
+		return m, cmd
 	case presenceCheckMsg:
 		cmd := m.checkPresence()
 		return m, cmd

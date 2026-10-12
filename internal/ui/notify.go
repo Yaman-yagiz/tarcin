@@ -32,6 +32,22 @@ const (
 	focusOut
 )
 
+// setTermFocus records the terminal's focus and tells Attention when the
+// user leaves or comes back. Focus that was never reported counts as
+// present, so the first FocusMsg changes nothing.
+func (m *Model) setTermFocus(f int8) tea.Cmd {
+	was := m.termFocus
+	if f == focusIn && was == focusUnknown {
+		m.termFocus = focusIn
+		return nil
+	}
+	m.termFocus = f
+	if was == f || m.attentionFn == nil {
+		return nil
+	}
+	return m.attentionFn(f == focusIn)
+}
+
 // notifications returns the commands that notify about a batch's new
 // messages: only live, unread, recent messages from others, in chats that
 // are not muted, and only while the terminal does not have focus. While

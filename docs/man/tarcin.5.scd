@@ -25,7 +25,8 @@ and comments; *tarcin config check* validates the file.
 *[privacy]*
 
 *read_receipts* = _true_
-	Tell senders when you have read their messages (blue ticks).
+	Tell senders when you have read their messages (blue ticks). A
+	message is read when its chat is open and the terminal has focus.
 
 *typing* = _true_
 	Show a chat when you are typing in it.

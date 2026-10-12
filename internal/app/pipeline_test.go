@@ -430,6 +430,70 @@ func TestReadReceiptsFollowThePrivacySetting(t *testing.T) {
 	}
 }
 
+// TestOpenChatStaysUnreadWhileAway checks that the open chat's new
+// messages are not read, and send no read receipts, while the terminal
+// lacks focus, and are read when the user is back.
+func TestOpenChatStaysUnreadWhileAway(t *testing.T) {
+	fb := fake.New(fake.Config{Seed: 6, Chats: 1, Tick: time.Millisecond})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	discard := backend.SinkFunc(func(context.Context, []domain.Event) error { return nil })
+	go func() { _ = fb.Run(ctx, discard) }() // online, so receipts can be sent
+	waitUntil(t, "the backend to connect", func() bool {
+		return fb.MarkRead(ctx, "", "", nil, time.Now()) == nil
+	})
+	p, err := openPipeline(t.Context(), filepath.Join(t.TempDir(), "tarcin.db"),
+		pipelineOptions{MeLID: "900@lid", Backend: fb, ReadReceipts: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = p.close(context.Background()) }()
+	if err := p.start(newRecordingUI()); err != nil {
+		t.Fatal(err)
+	}
+	incoming := func(waid string) {
+		t.Helper()
+		if err := p.Deliver(t.Context(), []domain.Event{domain.MessageReceived{Source: domain.SourceLive, Message: domain.IncomingMessage{
+			ChatJID: "101@lid", SenderJID: "101@lid", WAID: domain.WAMessageID(waid), Timestamp: time.Now(), Kind: domain.KindText, Body: "x",
+		}}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	incoming("A1")
+	chat, _, _ := p.reader.ChatID(t.Context(), "101@lid")
+	if msg := p.read(chat)(); msg != nil {
+		t.Fatalf("read = %#v", msg)
+	}
+	waitUntil(t, "the first receipt", func() bool { return len(fb.MarkedRead()) == 1 })
+
+	if cmd := p.attention(false); cmd != nil {
+		t.Fatal("leaving needs no command")
+	}
+	incoming("A2")
+	time.Sleep(100 * time.Millisecond)
+	if refs, _ := p.reader.UnreadIncoming(t.Context(), chat, 10); len(refs) != 1 {
+		t.Fatalf("%d unread messages while away, want 1", len(refs))
+	}
+	if n := len(fb.MarkedRead()); n != 1 {
+		t.Fatalf("%d receipts: a message that arrived while away was reported read", n)
+	}
+
+	cmd := p.attention(true)
+	if cmd == nil {
+		t.Fatal("coming back to an open chat must read it")
+	}
+	if msg := cmd(); msg != nil {
+		t.Fatalf("attention = %#v", msg)
+	}
+	waitUntil(t, "the receipt after coming back", func() bool { return len(fb.MarkedRead()) == 2 })
+	if refs, _ := p.reader.UnreadIncoming(t.Context(), chat, 10); len(refs) != 0 {
+		t.Fatal("the chat is read once the user is back")
+	}
+	// Back again, new messages are read as they arrive.
+	incoming("A3")
+	waitUntil(t, "the live receipt", func() bool { return len(fb.MarkedRead()) == 3 })
+}
+
 // TestRunDemoQuits runs the whole demo headless and quits it with ctrl+q.
 func TestRunDemoQuits(t *testing.T) {
 	t.Setenv("TARCIN_CACHE_DIR", t.TempDir())

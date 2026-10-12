@@ -91,6 +91,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Storage and load benchmarks for the performance budgets
   (`make storagebench`, `make loadtest`).
 
+### Fixed
+
+- The open chat no longer marks new messages read, or sends read
+  receipts, while the terminal does not have focus; it is read when you
+  come back.
+
 ### Security
 
 - Terminal-safe rendering of all untrusted text, fuzzed together with

@@ -194,7 +194,7 @@ func newSession(b backend.Backend, pipe *pipeline, set *settings, dataDir string
 			}
 			return 0, 0
 		}),
-		OpenMedia: pipe.openMedia(), SaveMedia: pipe.saveMedia(), Attach: pipe.attach(s.sender, b), Names: pipe.names, Send: pipe.send(s.sender, b), Forward: pipe.forward(s.sender, b), Retry: pipe.retry(s.sender), Read: pipe.read,
+		OpenMedia: pipe.openMedia(), SaveMedia: pipe.saveMedia(), Attach: pipe.attach(s.sender, b), Names: pipe.names, Send: pipe.send(s.sender, b), Forward: pipe.forward(s.sender, b), Retry: pipe.retry(s.sender), Read: pipe.read, Attention: pipe.attention,
 		Link: link, Reconnect: reconnectOption(b), DraftDir: set.drafts,
 	})
 	return s

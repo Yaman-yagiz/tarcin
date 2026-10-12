@@ -31,6 +31,10 @@ Even with `presence` on, tarcin is online only while you use it: from a
 key press until two minutes without one, or until the terminal loses
 focus.
 
+A message counts as read when its chat is open and the terminal has
+focus. While you are in another window, new messages stay unread, and
+no blue ticks are sent, until you come back.
+
 ## Look
 
 ```toml

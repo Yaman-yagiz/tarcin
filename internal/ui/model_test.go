@@ -767,6 +767,32 @@ func TestNotifications(t *testing.T) {
 	}
 }
 
+func TestAttentionFollowsTerminalFocus(t *testing.T) {
+	var got []bool
+	m := New(Options{History: emptyHistory{}, Attention: func(w bool) tea.Cmd { got = append(got, w); return nil }})
+	size(m, 120, 30)
+	m.Update(key("j")) // focus not reported yet: nothing to tell
+	m.Update(tea.FocusMsg{})
+	if len(got) != 0 {
+		t.Fatalf("attention = %v: the first focus report changes nothing", got)
+	}
+	m.Update(tea.BlurMsg{})
+	m.Update(tea.BlurMsg{})
+	m.Update(tea.FocusMsg{})
+	m.Update(tea.FocusMsg{})
+	if !slices.Equal(got, []bool{false, true}) {
+		t.Fatalf("attention = %v, want [false true]: one call per change", got)
+	}
+	// A key press brings the user back even if the terminal never reports
+	// focus again.
+	m.Update(tea.BlurMsg{})
+	m.Update(key("j"))
+	m.Update(key("k"))
+	if !slices.Equal(got, []bool{false, true, false, true}) {
+		t.Fatalf("attention = %v", got)
+	}
+}
+
 type findSource struct{ msgs []domain.Message }
 
 func (f findSource) Search(context.Context, string, domain.ChatID, int) ([]domain.Message, error) {
