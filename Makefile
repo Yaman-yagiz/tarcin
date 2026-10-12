@@ -49,12 +49,15 @@ GOTOOL := $(GO) tool -modfile=tools/go.mod
 # its own module graph instead of tools/go.mod.
 ACTIONLINT := github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
-.PHONY: all build test test-system-sqlite property cover ci ci-container aur-check repro-check hardening release loadtest storagebench golden lint lint-actions lint-shell check-spdx vuln licenses fmt vet bench fuzz fuzz-short man check-man tidy check-tidy install uninstall clean help
+.PHONY: all build config-example test test-system-sqlite property cover ci ci-container aur-check repro-check hardening release loadtest storagebench golden lint lint-actions lint-shell check-spdx vuln licenses fmt vet bench fuzz fuzz-short man check-man tidy check-tidy install uninstall clean help
 
-all: build
+all: build man config-example ## Build what `make install` installs: binary, man pages, example config (needs scdoc)
 
 build: ## Build ./build/tarcin
 	$(GO) build $(BUILD_FLAGS) -tags '$(TAGS)' -ldflags '$(GO_LDFLAGS)' -o $(BUILDDIR)/tarcin ./cmd/tarcin
+
+config-example: build ## Write the commented default config to ./build/config.example.toml
+	$(BUILDDIR)/tarcin config print-defaults > $(BUILDDIR)/config.example.toml
 
 test: ## Run all tests with the race detector
 	$(GO) test -race -tags '$(TAGS)' ./...
@@ -101,8 +104,8 @@ lint-shell: ## Lint shell scripts and the bash completion (shellcheck, skipped i
 
 man: ## Build the man pages into $(BUILDDIR)/man (needs scdoc)
 	@mkdir -p $(BUILDDIR)/man
-	$(SCDOC) < docs/man/tarcin.1.scd > $(BUILDDIR)/man/tarcin.1
-	$(SCDOC) < docs/man/tarcin.5.scd > $(BUILDDIR)/man/tarcin.5
+	$(SCDOC) < docs/man/tarcin.1.scd > $(BUILDDIR)/man/tarcin.1.tmp && mv $(BUILDDIR)/man/tarcin.1.tmp $(BUILDDIR)/man/tarcin.1 || { rm -f $(BUILDDIR)/man/tarcin.1.tmp; exit 1; }
+	$(SCDOC) < docs/man/tarcin.5.scd > $(BUILDDIR)/man/tarcin.5.tmp && mv $(BUILDDIR)/man/tarcin.5.tmp $(BUILDDIR)/man/tarcin.5 || { rm -f $(BUILDDIR)/man/tarcin.5.tmp; exit 1; }
 
 check-man: ## Build the man pages and validate the desktop file and completions (each skipped if its tool is missing)
 	@if command -v $(SCDOC) >/dev/null; then $(MAKE) --no-print-directory man && echo "man: ok"; \
@@ -158,7 +161,12 @@ check-tidy: ## Fail if go.mod or go.sum are not tidy
 	$(GO) mod tidy -diff
 	cd tools && $(GO) mod tidy -diff
 
-install: build man ## Install into $(DESTDIR)$(PREFIX) (needs scdoc)
+# install only copies what `make` built, so that `sudo make install` never
+# builds as root (root-owned files in ./build, root's Go caches).
+install: ## Install what `make` built into $(DESTDIR)$(PREFIX); run `make` first, as yourself
+	@for f in $(BUILDDIR)/tarcin $(BUILDDIR)/man/tarcin.1 $(BUILDDIR)/man/tarcin.5 $(BUILDDIR)/config.example.toml; do \
+		[ -s "$$f" ] || { echo "install: $$f is missing: run make first, as yourself rather than root"; exit 1; }; \
+	done
 	install -Dm755 $(BUILDDIR)/tarcin $(DESTDIR)$(PREFIX)/bin/tarcin
 	install -Dm644 $(BUILDDIR)/man/tarcin.1 $(DESTDIR)$(PREFIX)/share/man/man1/tarcin.1
 	install -Dm644 $(BUILDDIR)/man/tarcin.5 $(DESTDIR)$(PREFIX)/share/man/man5/tarcin.5
@@ -168,7 +176,6 @@ install: build man ## Install into $(DESTDIR)$(PREFIX) (needs scdoc)
 	install -Dm644 packaging/completions/tarcin.fish $(DESTDIR)$(PREFIX)/share/fish/vendor_completions.d/tarcin.fish
 	install -Dm644 LICENSE $(DESTDIR)$(PREFIX)/share/licenses/tarcin/LICENSE
 	install -Dm644 README.md $(DESTDIR)$(PREFIX)/share/doc/tarcin/README.md
-	$(BUILDDIR)/tarcin config print-defaults > $(BUILDDIR)/config.example.toml
 	install -Dm644 $(BUILDDIR)/config.example.toml $(DESTDIR)$(PREFIX)/share/doc/tarcin/config.example.toml
 
 uninstall: ## Remove files installed by `make install`

@@ -32,7 +32,9 @@ The Makefile is a convenience for developers only. Packagers call
 `go build` directly.
 
 - `make build`, `make test`, `make lint`, `make bench`, `make fuzz`,
-  `make man`, `make install DESTDIR=… PREFIX=/usr`.
+  `make man`, `make` (everything `make install` copies), and
+  `make install DESTDIR=… PREFIX=/usr`, which only copies, so that it
+  never builds as root.
 - It **respects** caller-supplied `GOFLAGS`, `CGO_*FLAGS` and `LDFLAGS`,
   and never overwrites them.
 

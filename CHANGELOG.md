@@ -99,6 +99,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `sudo make install` no longer builds as root, which left root-owned
+  files in `./build`: `make` builds everything it installs, as the user,
+  and `make install` only copies.
 - The open chat no longer marks new messages read, or sends read
   receipts, while the terminal does not have focus; it is read when you
   come back.

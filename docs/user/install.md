@@ -25,8 +25,8 @@ pages.
 ```sh
 git clone https://github.com/Yaman-yagiz/tarcin.git
 cd tarcin
-make build                     # ./build/tarcin, with the bundled SQLite
-sudo make install PREFIX=/usr  # the binary, man pages, completions, desktop file
+make                           # ./build: the binary (bundled SQLite), man pages, example config
+sudo make install PREFIX=/usr  # copies them, the completions and the desktop file into place
 ```
 
 `make install DESTDIR=… PREFIX=…` installs anywhere; `make uninstall`

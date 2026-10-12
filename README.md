@@ -86,8 +86,8 @@ cgo) and `scdoc` for the man pages:
 sudo pacman -S --needed go base-devel git scdoc
 git clone https://github.com/Yaman-yagiz/tarcin.git
 cd tarcin
-make build                     # ./build/tarcin
-sudo make install PREFIX=/usr  # binary, man pages, completions, desktop file
+make                           # ./build: binary, man pages, example config
+sudo make install PREFIX=/usr  # copy them, the completions and the desktop file into place
 ```
 
 See the [install guide](docs/user/install.md) for details.
