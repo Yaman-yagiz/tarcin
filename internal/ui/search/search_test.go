@@ -93,3 +93,17 @@ func TestSnippet(t *testing.T) {
 		t.Fatalf("snippet = %q", got)
 	}
 }
+
+// TestResultTextIsBounded: a huge body costs one bounded pass when the
+// results arrive, not one per frame, and its row text stays short.
+func TestResultTextIsBounded(t *testing.T) {
+	body := "kahve " + strings.Repeat("çok uzun bir mesaj ", 100_000)
+	got := resultText(body, "kahve")
+	if n := len([]rune(got)); n == 0 || n > resultRunes || !strings.HasPrefix(got, "kahve") {
+		t.Fatalf("result text: %d runes, starts %q", n, got[:min(len(got), 20)])
+	}
+	got = resultText(strings.Repeat("x ", 40)+"kahve\x1b]0;title\x07", "kahve")
+	if !strings.HasPrefix(got, "…") || !strings.Contains(got, "kahve") || strings.ContainsRune(got, '\x1b') {
+		t.Fatalf("result text = %q", got)
+	}
+}

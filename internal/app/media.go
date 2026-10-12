@@ -275,18 +275,25 @@ func (h *mediaHandler) evict(ctx context.Context, keep string) {
 // opener returns the command that opens a MIME type: the opener for the
 // exact type, else for "type/*", else the default.
 func (h *mediaHandler) opener(declared string) []string {
+	argv, _ := h.openerFor(declared)
+	return argv
+}
+
+// openerFor is opener, and whether an opener was configured for the type
+// rather than the default one.
+func (h *mediaHandler) openerFor(declared string) ([]string, bool) {
 	t, _, err := mime.ParseMediaType(declared)
 	if err == nil {
 		if argv, ok := h.o.Openers[t]; ok {
-			return argv
+			return argv, true
 		}
 		if major, _, ok := strings.Cut(t, "/"); ok {
 			if argv, ok := h.o.Openers[major+"/*"]; ok {
-				return argv
+				return argv, true
 			}
 		}
 	}
-	return h.o.Open
+	return h.o.Open, false
 }
 
 // startDetached runs a program without a shell and without the terminal,
@@ -311,7 +318,13 @@ func (h *mediaHandler) openMedia(msg domain.Message) tea.Cmd {
 		if err != nil {
 			return ui.BatchMsg{Notice: mediaProblem(err, h.o.Limit)}
 		}
-		argv := append(slices.Clone(h.opener(m.MIME)), path)
+		opener, chosen := h.openerFor(m.MIME)
+		if !chosen && extension(m.MIME) == ".bin" {
+			// The default opener would guess the type from the content, so
+			// a sender could make an "invoice" open as a web page.
+			return ui.BatchMsg{Notice: "Not opened: tarcin does not know this file type. Press s to save it, or set an opener for it"}
+		}
+		argv := append(slices.Clone(opener), path)
 		if err := h.o.start(argv); err != nil {
 			return ui.BatchMsg{Notice: "Could not open it with " + argv[0] + ": " + err.Error()}
 		}
@@ -361,22 +374,32 @@ func saveName(msg *domain.Message, m *domain.Media) string {
 		name = "tarcin " + msg.Kind.String() + " " + msg.Timestamp.Local().Format("2006-01-02 15-04-05")
 	}
 	// The last path element only, of either kind of separator; then no
-	// control, bidi or zero-width character, and no leading dot.
+	// control, bidi or zero-width character, no leading dot (a hidden
+	// file) and no leading dash (an option to the tools that read it).
 	name = filepath.Base(strings.ReplaceAll(name, "\\", "/"))
-	name = strings.ReplaceAll(sanitize.Line(name), "\x00", "")
-	name = strings.TrimLeft(strings.TrimSpace(name), ". ")
-	if name == "" || name == "." {
-		name = "media"
+	name = strings.NewReplacer("\x00", "", "/", "").Replace(sanitize.Line(name))
+	name = strings.TrimLeft(strings.TrimSpace(name), ".- ")
+	ext := filepath.Ext(name)
+	if len(ext) < 2 || len(ext) > maxExtension || ext == name {
+		ext = "" // none, or not one: the cache's extension follows
 	}
-	if filepath.Ext(name) == "" {
-		name += extension(m.MIME)
+	stem := strings.TrimSuffix(name, ext)
+	if ext == "" {
+		ext = extension(m.MIME)
 	}
-	if len(name) > 200 { // most file systems allow 255 bytes
-		ext := filepath.Ext(name)
-		name = strings.ToValidUTF8(name[:200-len(ext)], "") + ext
+	if len(stem)+len(ext) > 200 { // most file systems allow 255 bytes
+		stem = strings.ToValidUTF8(stem[:200-len(ext)], "")
 	}
-	return name
+	stem = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(stem), ".- "))
+	if stem == "" {
+		stem = "media"
+	}
+	return stem + ext
 }
+
+// maxExtension is the longest file name extension a saved file keeps,
+// with its dot.
+const maxExtension = 16
 
 // saveCopy copies src into dir as name, or "name (1).ext" and so on if
 // that exists: O_EXCL never replaces a file. It returns the path.

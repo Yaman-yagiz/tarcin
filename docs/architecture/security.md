@@ -69,19 +69,28 @@ it. How to report vulnerabilities is described in
    - Media downloads respect a configurable maximum size (default
      100 MiB), checked against the size declared in the message *and*
      enforced while streaming.
-   - History-sync payload handling is bounded, as described in
-     [event pipeline](event-pipeline.md) §3.1.
+   - A history-sync payload comes only from this account's phone
+     (item 9). whatsmeow decompresses it whole in memory; tarcin stores
+     it in chunks.
+   - A search result's row is built once, from at most 64 KiB of its
+     message, so a huge message cannot slow every frame.
 3. **File names are never used as paths.**
    - Cached media is stored under a content-addressed name
      (`sha256.ext`), where the extension comes from an allow-list keyed
      by MIME type.
    - When the user saves a file, the suggested name is passed through
-     `filepath.Base`, stripped of control and bidi characters and
-     leading dots, and saved with `O_EXCL` into the chosen directory.
-     tarcin never overwrites silently.
+     `filepath.Base`, stripped of control and bidi characters, slashes,
+     and leading dots and dashes; an extension longer than 16 bytes is
+     not kept, and the name is cut to 200 bytes. It is saved with
+     `O_EXCL` into the chosen directory: tarcin never overwrites
+     silently.
 4. **MIME types.** The declared MIME type is untrusted. The opener is
    chosen by the user's configuration, and files are never executed or
-   marked executable: cache files and saved copies are 0600.
+   marked executable: cache files and saved copies are 0600. A file of
+   a type outside the allow-list is never handed to the default opener,
+   which would guess its type from the content: a web page sent as a
+   document would open in the browser. It can be saved, or opened with
+   an opener configured for its type.
    Implemented in `internal/app/media.go`: the streaming limit wraps the
    file whatsmeow writes, so no write, seek or truncate grows it past the
    limit; the cache keeps to `media.cache_mib`, dropping the least
@@ -102,6 +111,28 @@ it. How to report vulnerabilities is described in
 9. **History arrives only from this account's phone.** A history-sync
    notification from anyone else is ignored: its inline payload could
    otherwise inject messages into any chat.
+10. **A message ID alone proves nothing.** Every member of a chat sees
+    a message's ID. A later message with a stored ID changes the stored
+    one only if it comes from the same sender: someone else cannot fill
+    the placeholder of a view-once message, which never reaches a linked
+    device, and make it read as its sender's words.
+11. **Names people choose are marked.** A push name or business name
+    shows with a leading "~", as in the official clients, so that it
+    cannot pass for a contact's name, "You" or a phone number. A name
+    that shows nothing (blank look-alike characters) falls back to the
+    number.
+12. **Work per message is bounded.** At most 1024 mentions are read from
+    a message, and a mention creates no identity. Operations waiting for
+    a message that has not arrived (edits, revokes, receipts) are stored
+    once, at most 10,000 per chat, timed when they arrived at the
+    latest, and pruned after 30 days, like reactions to messages that
+    never arrive. A sender's own time for an edit or a reaction is never
+    later than the server's.
+13. **Settings change only by the right party.** A group's
+    disappearing-message timer comes from the server's group info, not
+    from a member's message, and a direct chat accepts only the timers
+    WhatsApp offers. Only this account's own devices can mark a chat
+    read for it.
 
 ## 5. Controls: logging and diagnostics
 

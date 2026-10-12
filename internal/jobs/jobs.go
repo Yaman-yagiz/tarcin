@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -270,7 +271,7 @@ func (p *Pool) run(f *flight) (err error) {
 	defer cancel()
 	defer func() {
 		if r := recover(); r != nil {
-			err = Permanent(fmt.Errorf("jobs: %s panicked: %v", f.key, r))
+			err = Permanent(fmt.Errorf("jobs: %s panicked: %s", f.key, panicText(r)))
 		}
 	}()
 	return f.fn(ctx)
@@ -313,4 +314,13 @@ func (p *Pool) Close() {
 	p.mu.Unlock()
 	p.cancel()
 	p.wg.Wait()
+}
+
+// panicText describes a recovered panic without its value, which may hold
+// message content: a runtime error's text, or the value's type.
+func panicText(r any) string {
+	if re, ok := r.(runtime.Error); ok {
+		return re.Error()
+	}
+	return fmt.Sprintf("%T", r)
 }

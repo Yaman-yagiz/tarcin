@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"slices"
 	"sync/atomic"
 	"time"
 
@@ -97,6 +96,7 @@ type applyTx struct {
 	activity map[domain.ChatID]*activity
 	touched  []domain.ChatID                // the chats in activity, in the order first seen
 	pending  map[domain.ChatID]bool         // whether operations wait in a chat
+	waiting  map[domain.ChatID]int          // how many, once counted in this transaction
 	named    map[domain.IdentityID]struct{} // identities a message offered a push name for
 }
 
@@ -126,6 +126,7 @@ func (a *EventApplier) Apply(ctx context.Context, tx *sql.Tx, events []domain.Ev
 		ctx: ctx, tx: tx, ch: ch, a: a, now: a.opts.Now().UnixMilli(),
 		aliases: map[domain.JID]domain.IdentityID{}, chats: map[domain.JID]chatRow{},
 		activity: map[domain.ChatID]*activity{}, pending: map[domain.ChatID]bool{}, named: map[domain.IdentityID]struct{}{},
+		waiting: map[domain.ChatID]int{},
 	}
 	for _, ev := range events {
 		if _, ok := ev.(domain.MessageReceived); !ok {
@@ -197,6 +198,11 @@ func (a *EventApplier) Maintain(ctx context.Context, tx *sql.Tx) error {
 	now := a.opts.Now()
 	cutoff := now.Add(-PendingOpsRetention).UnixMilli()
 	if _, err := tx.ExecContext(ctx, "DELETE FROM pending_ops WHERE ts < ?", cutoff); err != nil {
+		return err
+	}
+	// Reactions to messages that never arrived, after the same wait.
+	if _, err := tx.ExecContext(ctx, `DELETE FROM reactions WHERE ts < ? AND NOT EXISTS (
+		SELECT 1 FROM messages m WHERE m.chat_id = reactions.chat_id AND m.wa_id = reactions.target_wa_id)`, cutoff); err != nil {
 		return err
 	}
 	_, err := rebuildIndexIfStale(ctx, tx, now.UnixMilli())
@@ -680,15 +686,24 @@ func (t *applyTx) unlinkUnused(names []string) error {
 // mentions returns the JSON array of the mentioned JIDs to store, or nil
 // for none, and makes sure each is a known person, so that a name
 // learned later shows in the mention.
+// maxMentions bounds the people one message mentions: a group has at
+// most 1024 members, and a sender must not make a message costly.
+const maxMentions = 1024
+
+// mentions returns the JSON list of the people a message mentions, at
+// most maxMentions. Reads find them through jid_aliases, so a mention of
+// someone unknown creates no identity.
 func (t *applyTx) mentions(jids []domain.JID) (any, error) {
 	var keep []string
+	seen := make(map[domain.JID]bool, min(len(jids), maxMentions))
 	for _, j := range jids {
-		if !j.IsUser() || slices.Contains(keep, string(j)) {
+		if len(keep) == maxMentions {
+			break
+		}
+		if !j.IsUser() || seen[j] {
 			continue
 		}
-		if _, err := t.resolve(j); err != nil {
-			return nil, err
-		}
+		seen[j] = true
 		keep = append(keep, string(j))
 	}
 	if len(keep) == 0 {
@@ -703,19 +718,24 @@ func (t *applyTx) redelivered(chat chatRow, in *domain.IncomingMessage, kind dom
 	sender any, status domain.MessageStatus, raw, mentions any,
 ) error {
 	var (
-		id              domain.MessageID
-		storedSender    sql.NullInt64
-		storedStatus    int64
-		storedKind      string
-		hasRaw, revoked bool
+		id                      domain.MessageID
+		storedSender            sql.NullInt64
+		storedStatus            int64
+		storedKind              string
+		fromMe, hasRaw, revoked bool
 	)
-	if err := t.queryRow(`SELECT id, sender_id, status, kind, raw IS NOT NULL, revoked_at IS NOT NULL
+	if err := t.queryRow(`SELECT id, sender_id, from_me, status, kind, raw IS NOT NULL, revoked_at IS NOT NULL
 		FROM messages WHERE chat_id = ? AND wa_id = ?`, chat.id, in.WAID).
-		Scan(&id, &storedSender, &storedStatus, &storedKind, &hasRaw, &revoked); err != nil {
+		Scan(&id, &storedSender, &fromMe, &storedStatus, &storedKind, &hasRaw, &revoked); err != nil {
 		return err
 	}
-	if s, ok := sender.(domain.IdentityID); ok && storedSender.Valid && domain.IdentityID(storedSender.Int64) != s {
+	// The same ID from someone else is another message: every member of
+	// a chat sees a message's ID, so a placeholder (a view-once message,
+	// say) must never take content from a different sender.
+	s, known := sender.(domain.IdentityID)
+	if fromMe != in.FromMe || known && storedSender.Valid && domain.IdentityID(storedSender.Int64) != s {
 		t.a.senderMismatch.Add(1) // counted, never logged with content
+		return nil
 	}
 	changed := false
 	cur := domain.MessageStatus(u8(storedStatus))
@@ -877,15 +897,42 @@ type pendingOp struct {
 	ByAdmin bool                 `json:"by_admin,omitempty"`
 }
 
+// maxPendingPerChat bounds the operations that wait in one chat for
+// targets that have not arrived; beyond it, new ones are dropped.
+const maxPendingPerChat = 10_000
+
+// addPending stores an operation until its target arrives. Its time is
+// at most now, so that the retention prune removes it even if the sender
+// claimed a later time; a repeated operation is stored once.
 func (t *applyTx) addPending(chat domain.ChatID, target domain.WAMessageID, kind string, op pendingOp, ts int64) error {
 	payload, err := json.Marshal(op)
 	if err != nil {
 		return err
 	}
-	_, err = t.exec("INSERT INTO pending_ops (chat_id, target_wa_id, kind, payload, ts) VALUES (?, ?, ?, ?, ?)",
-		chat, target, kind, payload, ts)
+	n, ok := t.waiting[chat]
+	if !ok {
+		if err := t.queryRow("SELECT count(*) FROM pending_ops WHERE chat_id = ?", chat).Scan(&n); err != nil {
+			return err
+		}
+	}
+	if n >= maxPendingPerChat {
+		t.waiting[chat] = n
+		t.a.skipped.Add(1)
+		return nil
+	}
+	res, err := t.exec(`INSERT INTO pending_ops (chat_id, target_wa_id, kind, payload, ts)
+		SELECT ?1, ?2, ?3, ?4, ?5 WHERE NOT EXISTS (SELECT 1 FROM pending_ops
+			WHERE chat_id = ?1 AND target_wa_id = ?2 AND kind = ?3 AND payload = ?4)`,
+		chat, target, kind, payload, min(ts, t.now))
+	if err != nil {
+		return err
+	}
+	if added, _ := res.RowsAffected(); added > 0 {
+		n++
+	}
+	t.waiting[chat] = n
 	t.pending[chat] = true
-	return err
+	return nil
 }
 
 // hasPending reports whether operations wait in a chat: a run of messages

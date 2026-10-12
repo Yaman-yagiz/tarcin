@@ -37,9 +37,10 @@ type OpenMsg struct {
 
 // ResultsMsg delivers a search's results.
 type ResultsMsg struct {
-	gen  int
-	msgs []domain.Message
-	err  error
+	gen   int
+	msgs  []domain.Message
+	snips []string // each result's text as shown, made once
+	err   error
 }
 
 // Model is the search view.
@@ -53,6 +54,7 @@ type Model struct {
 	query   string
 	chat    domain.ChatID // 0: all chats
 	results []domain.Message
+	snips   []string
 	loading bool
 	err     error
 
@@ -76,13 +78,17 @@ func (m *Model) Resize(w, h int) { m.w, m.h = w, h }
 func (m *Model) Open(query string, chat domain.ChatID) tea.Cmd {
 	m.gen++
 	m.query, m.chat = query, chat
-	m.results, m.err, m.loading, m.sel, m.offset = nil, nil, true, 0, 0
+	m.results, m.snips, m.err, m.loading, m.sel, m.offset = nil, nil, nil, true, 0, 0
 	gen, src := m.gen, m.src
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		msgs, err := src.Search(ctx, query, chat, Limit)
-		return ResultsMsg{gen: gen, msgs: msgs, err: err}
+		snips := make([]string, len(msgs))
+		for i := range msgs {
+			snips[i] = resultText(msgs[i].Body, firstWord(query))
+		}
+		return ResultsMsg{gen: gen, msgs: msgs, snips: snips, err: err}
 	}
 }
 
@@ -92,7 +98,7 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case ResultsMsg:
 		if msg.gen == m.gen {
-			m.results, m.err, m.loading = msg.msgs, msg.err, false
+			m.results, m.snips, m.err, m.loading = msg.msgs, msg.snips, msg.err, false
 		}
 	case keymap.ActionMsg:
 		return m.act(msg.Action)
@@ -192,7 +198,10 @@ func (m *Model) row(i int) string {
 		where = uikit.Display(method, title) + " · " // a direct chat is named after the sender already
 	}
 	when := r.Timestamp.In(m.loc).Format("2 Jan 15:04")
-	text := uikit.Display(method, snippet(oneLine(r.Body), firstWord(m.query), 30))
+	var text string
+	if i < len(m.snips) {
+		text = uikit.Display(method, m.snips[i])
+	}
 	if i == m.sel {
 		return t.SelectedFocused.Render(uikit.Fit(method, " "+where+who+"  "+when+"  "+text, m.w))
 	}
@@ -204,6 +213,27 @@ func firstWord(q string) string {
 		return f[0]
 	}
 	return ""
+}
+
+// Bounds of a result's text: the body is read up to resultSource bytes,
+// and the row shows resultRunes runes from a little before the match. A
+// row is narrower anyway; a huge body must not slow every frame.
+const (
+	resultSource = 64 << 10
+	resultRunes  = 400
+)
+
+// resultText is a result's text as its row shows it: one sanitized line
+// that starts a little before the first match of word.
+func resultText(body, word string) string {
+	if len(body) > resultSource {
+		body = strings.ToValidUTF8(body[:resultSource], "")
+	}
+	text := snippet(oneLine(body), word, 30)
+	if r := []rune(text); len(r) > resultRunes {
+		text = string(r[:resultRunes])
+	}
+	return text
 }
 
 // snippet starts text a little before the first case-insensitive match

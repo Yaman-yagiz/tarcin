@@ -20,6 +20,9 @@ func normalizeReceipt(e *events.Receipt) []domain.Event {
 	var status domain.MessageStatus
 	switch e.Type {
 	case types.ReceiptTypeReadSelf, types.ReceiptTypePlayedSelf:
+		if !e.IsFromMe {
+			return nil // only this account's devices read for it
+		}
 		return []domain.Event{domain.ChatRead{ChatJID: chat, ReadAt: e.Timestamp}}
 	case types.ReceiptTypeDelivered:
 		status = domain.StatusDelivered

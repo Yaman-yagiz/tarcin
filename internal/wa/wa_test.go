@@ -189,7 +189,7 @@ func (blockingSink) Deliver(ctx context.Context, _ []domain.Event) error {
 // panickingSink panics, as a bug in normalisation would.
 type panickingSink struct{}
 
-func (panickingSink) Deliver(context.Context, []domain.Event) error { panic("bug") }
+func (panickingSink) Deliver(context.Context, []domain.Event) error { panic("canary 7c1e") }
 
 func TestHandlerWaitsForTheCommitWithATimeout(t *testing.T) {
 	s := openTestSession(t, filepath.Join(t.TempDir(), "session.db"))
@@ -206,10 +206,13 @@ func TestHandlerWaitsForTheCommitWithATimeout(t *testing.T) {
 	if a.handle(t.Context(), panickingSink{}, &events.Connected{}) {
 		t.Fatal("a panic must withhold the acknowledgement")
 	}
-	for _, want := range []string{"event not stored", "context deadline exceeded", "event handler panicked", "panic=bug"} {
+	for _, want := range []string{"event not stored", "context deadline exceeded", "event handler panicked", "panic=string"} {
 		if !strings.Contains(logged.String(), want) {
 			t.Fatalf("the log lacks %q:\n%s", want, logged.String())
 		}
+	}
+	if strings.Contains(logged.String(), "7c1e") {
+		t.Fatal("a panic's value may hold message content and must not be logged")
 	}
 	if !a.cli.SynchronousAck || !a.cli.EnableDecryptedEventBuffer || !a.cli.AutomaticMessageRerequestFromPhone ||
 		!a.cli.UseRetryMessageStore || !a.cli.EnableAutoReconnect || a.cli.AutoReconnectHook == nil {

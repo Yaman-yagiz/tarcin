@@ -43,12 +43,17 @@ func TestExtensionAndSaveName(t *testing.T) {
 		{"", "image/jpeg", "tarcin image 2026-10-11 14-02-03.jpg"},
 		{`C:\\Users\\x\\a.txt`, "text/plain", "a.txt"},
 		{strings.Repeat("ş", 300) + ".pdf", "application/pdf", ""},
+		{"/", "application/pdf", "media.pdf"},
+		{`\\`, "text/plain", "media.txt"},
+		{"a." + strings.Repeat("b", 300), "text/plain", ""},
+		{"--checkpoint-action=exec=sh x.sh", "application/x-sh", "checkpoint-action=exec=sh x.sh"},
+		{"x" + strings.Repeat(".", 199) + "abc", "text/plain", ""},
 	} {
 		got := saveName(&domain.Message{Kind: domain.KindImage, Timestamp: at}, &domain.Media{FileName: tt.file, MIME: tt.mime})
 		switch {
 		case tt.want == "":
-			if len(got) > 200 || !strings.HasSuffix(got, ".pdf") {
-				t.Errorf("a long name must be cut to 200 bytes with its extension: %d bytes %q", len(got), got[len(got)-10:])
+			if len(got) > 200 || strings.HasPrefix(got, ".") || !strings.HasSuffix(got, filepath.Ext(tt.file)) && !strings.HasSuffix(got, extension(tt.mime)) {
+				t.Errorf("a long name must be cut to 200 bytes with an extension and no leading dot: %d bytes %q", len(got), got)
 			}
 		case got != tt.want:
 			t.Errorf("saveName(%q) = %q, want %q", tt.file, got, tt.want)

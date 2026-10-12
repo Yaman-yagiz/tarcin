@@ -2,6 +2,8 @@
 
 package domain
 
+import "unicode"
+
 // IdentityID is the local, stable ID of a person (a row in identities).
 type IdentityID int64
 
@@ -29,21 +31,40 @@ func (i Identity) CanonicalJID() JID {
 
 // DisplayName returns the name to show for the identity, in priority
 // order: contact name, push name, business name, phone number, and a
-// shortened LID. Names are raw and must be sanitized before rendering.
+// shortened LID. A name the person chose for themselves starts with "~",
+// as in the official clients, so that it cannot pass for a contact's
+// name, "You" or a phone number; a name that shows nothing is skipped.
+// Names are raw and must be sanitized before rendering.
 func (i Identity) DisplayName() string {
 	switch {
-	case i.ContactName != "":
+	case visible(i.ContactName):
 		return i.ContactName
-	case i.PushName != "":
-		return i.PushName
-	case i.BusinessName != "":
-		return i.BusinessName
+	case visible(i.PushName):
+		return "~" + i.PushName
+	case visible(i.BusinessName):
+		return "~" + i.BusinessName
 	case !i.PN.IsZero():
 		return "+" + i.PN.User()
 	case !i.LID.IsZero():
 		return "~" + lastN(i.LID.User(), 4)
 	}
 	return "unknown"
+}
+
+// visible reports whether s shows anything: a letter, digit, symbol or
+// punctuation mark other than the blank look-alikes (the braille blank
+// and the Hangul fillers) that make a name look empty.
+func visible(s string) bool {
+	for _, r := range s {
+		switch r {
+		case '\u2800', '\u115f', '\u1160', '\u3164', '\uffa0':
+			continue
+		}
+		if unicode.In(r, unicode.L, unicode.N, unicode.S, unicode.P) {
+			return true
+		}
+	}
+	return false
 }
 
 func lastN(s string, n int) string {

@@ -497,6 +497,37 @@ func TestApplyRedeliveryImprovesTheRow(t *testing.T) {
 	}
 }
 
+// TestApplyRedeliveryFromAnotherSenderIsRefused: a message ID is visible
+// to every member, so someone else's message with the ID of a placeholder
+// (a view-once message never reaches a linked device) must not fill it.
+func TestApplyRedeliveryFromAnotherSenderIsRefused(t *testing.T) {
+	f := newApplyFixture(t)
+	viewOnce := incoming(group, aliLID, "W1", "", 10)
+	viewOnce.Message.Kind = domain.KindUnsupported
+	f.apply(viewOnce)
+	forged := incoming(group, "666@lid", "W1", "transfer the money", 11)
+	if ch := f.apply(forged); len(ch.Updated) != 0 || len(ch.Added) != 0 {
+		t.Fatalf("a message from another sender changed the row: %+v", ch)
+	}
+	c, _, _ := f.r.ChatID(t.Context(), group)
+	if m := f.messages(c)[0]; m.Kind != domain.KindUnsupported || m.Body != "" || m.SenderID != f.identity(aliLID).ID {
+		t.Fatalf("placeholder = %+v", m)
+	}
+
+	// In a direct chat, the peer cannot fill this account's own placeholder.
+	own := incoming(aliLID, meLID, "W2", "", 12)
+	own.Message.FromMe, own.Message.Kind = true, domain.KindUnsupported
+	f.apply(own)
+	f.apply(incoming(aliLID, aliLID, "W2", "I agree to pay", 13))
+	dm, _, _ := f.r.ChatID(t.Context(), aliLID)
+	if m := f.messages(dm)[0]; !m.FromMe || m.Body != "" || m.Kind != domain.KindUnsupported {
+		t.Fatalf("own placeholder = %+v", m)
+	}
+	if got := f.a.Stats().SenderMismatches; got != 2 {
+		t.Fatalf("%d mismatches counted, want 2", got)
+	}
+}
+
 func TestApplyPlainTextKeepsNoRaw(t *testing.T) {
 	f := newApplyFixture(t)
 	e := incoming(group, aliLID, "W1", "text", 1)
@@ -813,6 +844,45 @@ func TestApplyMaintainPrunesOldPendingOps(t *testing.T) {
 	}
 }
 
+// TestApplyPendingOpsAreBounded: what waits for a target that never
+// comes cannot grow without bound, whatever times its senders claim.
+func TestApplyPendingOpsAreBounded(t *testing.T) {
+	f := newApplyFixture(t)
+	future := domain.MessageEdited{ChatJID: group, TargetWAID: "FUTURE", Body: "x", EditedAt: at(1000).AddDate(5, 0, 0)}
+	f.apply(future)
+	f.apply(future) // redelivered
+	if n := f.count(fmt.Sprintf("SELECT count(*) FROM pending_ops WHERE target_wa_id = 'FUTURE' AND ts <= %d", at(1000).UnixMilli())); n != 1 {
+		t.Fatalf("%d rows for one future edit; want one, timed now at the latest", n)
+	}
+	var evs []domain.Event
+	for i := range maxPendingPerChat + 50 {
+		evs = append(evs, domain.MessageEdited{ChatJID: group, TargetWAID: domain.WAMessageID(fmt.Sprint("T", i)), Body: "x", EditedAt: at(10)})
+	}
+	f.apply(evs...)
+	if n := f.count("SELECT count(*) FROM pending_ops"); n != maxPendingPerChat {
+		t.Fatalf("%d operations wait in one chat, want at most %d", n, maxPendingPerChat)
+	}
+
+	old := at(1000).Add(-31 * 24 * time.Hour)
+	f.apply(incoming(group, aliLID, "HERE", "hi", 1))
+	f.apply(domain.ReactionReceived{ChatJID: group, TargetWAID: "HERE", SenderJID: aliLID, Emoji: "x", Timestamp: old})
+	f.apply(domain.ReactionReceived{ChatJID: group, TargetWAID: "GONE", SenderJID: aliLID, Emoji: "x", Timestamp: old})
+	tx, err := f.db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.a.Maintain(t.Context(), tx); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	var left string
+	if err := f.db.QueryRowContext(t.Context(), "SELECT group_concat(target_wa_id) FROM reactions").Scan(&left); err != nil || left != "HERE" {
+		t.Fatalf("reactions left: %q, %v; a reaction to a message that never came goes after the retention", left, err)
+	}
+}
+
 func TestEventApplierThroughTheWriter(t *testing.T) {
 	f := newApplyFixture(t)
 	commits := make(chan *Changes, 4)
@@ -863,12 +933,17 @@ func TestReadMentions(t *testing.T) {
 	m.Message.Mentions = []domain.JID{ayPN, aliLID, ayPN, "bad"}
 	f.apply(m)
 	msg := f.messages(f.chats()[0].ID)[0]
-	ay := f.identity(ayPN)
-	want := []domain.Mention{{Token: "@902", Identity: ay.ID}, {Token: "@101", Identity: f.identity(aliLID).ID}}
+	// Someone unknown is mentioned by address only: a mention creates no
+	// identity, so a sender cannot fill the store with them.
+	want := []domain.Mention{{Token: "@902", Identity: 0}, {Token: "@101", Identity: f.identity(aliLID).ID}}
 	if !slices.Equal(msg.Mentions, want) {
 		t.Fatalf("mentions = %+v, want %+v", msg.Mentions, want)
 	}
-	// When Ayşe's number and LID merge, the mention names the survivor.
+	if n := f.count("SELECT count(*) FROM jid_aliases WHERE jid = '902@s.whatsapp.net'"); n != 0 {
+		t.Fatal("a mention must not create an identity")
+	}
+	// Once Ayşe's number is known and merged with her LID, the mention
+	// names her.
 	f.apply(domain.IdentityLinked{PN: ayPN, LID: ayLID})
 	msg = f.messages(f.chats()[0].ID)[0]
 	if survivor := f.identity(ayLID); msg.Mentions[0].Identity != survivor.ID || survivor.ID == 0 {
@@ -877,6 +952,14 @@ func TestReadMentions(t *testing.T) {
 	f.apply(incoming(group, aliLID, "W2", "none", 2))
 	if msgs := f.messages(f.chats()[0].ID); msgs[1].Mentions != nil {
 		t.Fatalf("no mentions: %+v", msgs[1].Mentions)
+	}
+	many := incoming(group, aliLID, "W3", "@all", 3)
+	for i := range maxMentions + 500 {
+		many.Message.Mentions = append(many.Message.Mentions, domain.JID(fmt.Sprintf("%d@lid", 5000+i%(maxMentions+100))))
+	}
+	f.apply(many)
+	if msgs := f.messages(f.chats()[0].ID); len(msgs[2].Mentions) != maxMentions {
+		t.Fatalf("%d mentions kept, want at most %d", len(msgs[2].Mentions), maxMentions)
 	}
 	if _, err := parseMentions(`[["x"]]`); err == nil {
 		t.Fatal("a malformed mention must be an error")

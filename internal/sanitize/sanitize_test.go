@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/Yaman-yagiz/tarcin/internal/devtools/synth"
@@ -209,5 +210,26 @@ func BenchmarkText(b *testing.B) {
 				_ = Text(in)
 			}
 		})
+	}
+}
+
+// TestMarksCapSurvivesJoiners: joiners between runs of combining marks
+// must not reset the cap, or one cell could carry thousands of marks.
+func TestMarksCapSurvivesJoiners(t *testing.T) {
+	zalgo := "a" + strings.Repeat(strings.Repeat("\u0301", 8)+"\u200d", 500)
+	for name, got := range map[string]string{"Text": Text(zalgo), "Line": Line(zalgo)} {
+		marks := 0
+		for _, r := range got {
+			if unicode.Is(unicode.Mn, r) {
+				marks++
+			}
+		}
+		if limit := map[string]int{"Text": maxMarksText, "Line": maxMarksLine}[name]; marks > limit {
+			t.Errorf("%s kept %d marks on one base, want at most %d", name, marks, limit)
+		}
+	}
+	// Emoji sequences keep their joiners.
+	if family := "\U0001F468\u200d\U0001F469\u200d\U0001F467"; Text(family) != family {
+		t.Fatalf("Text(family) = %q", Text(family))
 	}
 }

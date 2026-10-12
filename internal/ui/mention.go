@@ -123,7 +123,7 @@ func (m *Model) handleSuggestionKey(key string) bool {
 	switch key {
 	case "tab":
 		c := m.mention.shown[m.mention.pick]
-		m.comp.CompleteMention(c.Name, c.JID)
+		m.comp.CompleteMention(oneLine(c.Name), c.JID) // a push name: network text
 		m.mention.pick = 0
 		m.showSuggestions(nil)
 	case "ctrl+n":

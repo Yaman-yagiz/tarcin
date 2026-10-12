@@ -30,7 +30,8 @@ func TestNormalizeReceipts(t *testing.T) {
 		t.Fatalf("a read on another own device reads the chat: %+v", read)
 	}
 	for _, rc := range []*events.Receipt{r(types.ReceiptTypeRetry, false), r(types.ReceiptTypeSender, true),
-		r(types.ReceiptTypeDelivered, true), r(types.ReceiptTypeServerError, false)} {
+		r(types.ReceiptTypeDelivered, true), r(types.ReceiptTypeServerError, false),
+		r(types.ReceiptTypeReadSelf, false), r(types.ReceiptTypePlayedSelf, false)} { // someone else cannot read for this account
 		if evs := normalizeReceipt(rc); evs != nil {
 			t.Errorf("%q from me=%v: %+v", rc.Type, rc.IsFromMe, evs)
 		}

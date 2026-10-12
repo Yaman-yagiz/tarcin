@@ -17,8 +17,11 @@ func TestDisplayNamePriority(t *testing.T) {
 		want string
 	}{
 		{"contact name wins", Identity{ContactName: "Ayşe", PushName: "ayse", BusinessName: "Shop", PN: pn, LID: lid}, "Ayşe"},
-		{"push name", Identity{PushName: "ayse", BusinessName: "Shop", PN: pn}, "ayse"},
-		{"business name", Identity{BusinessName: "Shop", PN: pn}, "Shop"},
+		{"push name, marked as self-chosen", Identity{PushName: "ayse", BusinessName: "Shop", PN: pn}, "~ayse"},
+		{"business name, marked", Identity{BusinessName: "Shop", PN: pn}, "~Shop"},
+		{"a push name cannot pass for You", Identity{PushName: "You", PN: pn}, "~You"},
+		{"a blank push name is skipped", Identity{PushName: "\u2800\u3164 \u200b", PN: pn}, "+905551112233"},
+		{"a blank contact name is skipped", Identity{ContactName: "\u115f", PushName: "ayse"}, "~ayse"},
 		{"phone number", Identity{PN: pn, LID: lid}, "+905551112233"},
 		{"short LID", Identity{LID: lid}, "~6789"},
 		{"very short LID", Identity{LID: JID("12@lid")}, "~12"},

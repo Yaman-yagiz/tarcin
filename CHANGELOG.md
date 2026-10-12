@@ -118,6 +118,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Terminal-safe rendering of all untrusted text, fuzzed together with
   message normalisation, history sync and config parsing.
+- A message from another sender with the ID of a stored message no
+  longer changes it: someone could fill the placeholder of a view-once
+  message and make it read as its sender's, or as your own.
+- Names people choose for themselves (push and business names) show
+  with a leading "~", so they cannot pass for a contact, "You" or a
+  phone number; names that show nothing fall back to the number.
+- A file of an unknown type is not handed to the default opener, which
+  would guess its type from its content and could open a page in the
+  browser; press `s` to save it.
+- Saving a file with a very long extension no longer crashes tarcin,
+  and saved names never start with a dot or a dash.
+- A group member can no longer change the group's disappearing-message
+  timer through a message; direct chats accept only WhatsApp's timers.
+- Mentions are capped at 1024 per message and create no identities;
+  waiting edits, revokes and receipts are stored once, capped per chat
+  and always pruned; reactions to messages that never arrive are pruned.
+- A read-on-another-device receipt is accepted only from this account.
+- A sender's own times for edits and reactions are never later than the
+  server's.
+- Names inserted by mention completion are sanitized, and joiners no
+  longer lift the cap on stacked combining marks.
+- Panic values are kept out of the log and of job errors, since they
+  may hold message content.
+- The bump-whatsmeow workflow runs the new code with a read-only token;
+  the job that pushes runs no module code.
 - Edits and deletions are applied only when their sender may make them:
   the author, or a group admin for an admin deletion.
 - History sync notifications are accepted only from this account's own

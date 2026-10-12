@@ -83,22 +83,29 @@ func (a *Adapter) protocol(chat domain.JID, info *types.MessageInfo, pm *waE2E.P
 		return []domain.Event{domain.MessageRevoked{ChatJID: chat, TargetWAID: target, RevokedAt: info.Timestamp,
 			Actor: fromJID(info.Sender), ByAdmin: info.Edit == types.EditAttributeAdminRevoke}}
 	case waE2E.ProtocolMessage_MESSAGE_EDIT:
+		// The sender sets the edit's own time; it may be earlier than the
+		// server's, never later.
 		at := info.Timestamp
-		if ms := pm.GetTimestampMS(); ms > 0 {
+		if ms := pm.GetTimestampMS(); ms > 0 && time.UnixMilli(ms).Before(at) {
 			at = time.UnixMilli(ms)
 		}
 		return []domain.Event{domain.MessageEdited{ChatJID: chat, TargetWAID: target,
 			Body: content(pm.GetEditedMessage()).body, EditedAt: at, Actor: fromJID(info.Sender)}}
 	case waE2E.ProtocolMessage_EPHEMERAL_SETTING:
-		return []domain.Event{domain.ChatUpdated{ChatJID: chat, Fields: domain.ChatFieldEphemeral,
-			EphemeralTimer: time.Duration(pm.GetEphemeralExpiration()) * time.Second}}
+		// A group's timer comes from the server's group info, which knows
+		// who may change it; any member can send this message.
+		timer := time.Duration(pm.GetEphemeralExpiration()) * time.Second
+		if info.IsGroup || !slices.Contains(ephemeralTimers, timer) {
+			return nil
+		}
+		return []domain.Event{domain.ChatUpdated{ChatJID: chat, Fields: domain.ChatFieldEphemeral, EphemeralTimer: timer}}
 	}
 	return nil // history notifications, key shares and the like are whatsmeow's business
 }
 
 func reaction(chat domain.JID, info *types.MessageInfo, r *waE2E.ReactionMessage) domain.Event {
-	at := info.Timestamp
-	if ms := r.GetSenderTimestampMS(); ms > 0 {
+	at := info.Timestamp // the sender's own time may be earlier, never later
+	if ms := r.GetSenderTimestampMS(); ms > 0 && time.UnixMilli(ms).Before(at) {
 		at = time.UnixMilli(ms)
 	}
 	return domain.ReactionReceived{ChatJID: chat, TargetWAID: domain.WAMessageID(r.GetKey().GetID()),
@@ -127,11 +134,22 @@ func (a *Adapter) flags(evt *events.Message, ctx *waE2E.ContextInfo) domain.Mess
 	return f
 }
 
+// ephemeralTimers are the disappearing-message timers WhatsApp offers:
+// off, 24 hours, 7 days and 90 days.
+var ephemeralTimers = []time.Duration{0, 24 * time.Hour, 7 * 24 * time.Hour, 90 * 24 * time.Hour}
+
+// maxMentioned bounds the mentions read from one message; a group has at
+// most 1024 members.
+const maxMentioned = 1024
+
 // mentioned returns the people a message mentions, skipping JIDs that do
 // not parse.
 func mentioned(ctx *waE2E.ContextInfo) []domain.JID {
 	var out []domain.JID
 	for _, s := range ctx.GetMentionedJID() {
+		if len(out) == maxMentioned {
+			break
+		}
 		if jid, err := types.ParseJID(s); err == nil && !jid.IsEmpty() {
 			out = append(out, fromJID(jid))
 		}

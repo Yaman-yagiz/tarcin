@@ -129,10 +129,16 @@ func TestNormalizeEditsRevokesReactions(t *testing.T) {
 	a := testAdapter(t)
 	key := &waCommon.MessageKey{ID: proto.String("TARGET")}
 	edit := groupMsg(&waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{Type: waE2E.ProtocolMessage_MESSAGE_EDIT.Enum(), Key: key,
-		TimestampMS: proto.Int64(ts.Add(time.Minute).UnixMilli()), EditedMessage: &waE2E.Message{Conversation: proto.String("düzeltildi")}}})
+		TimestampMS: proto.Int64(ts.Add(-time.Second).UnixMilli()), EditedMessage: &waE2E.Message{Conversation: proto.String("düzeltildi")}}})
 	if e := one(t, a.normalizeMessage(edit, domain.SourceLive)).(domain.MessageEdited); e.TargetWAID != "TARGET" ||
-		e.Body != "düzeltildi" || !e.EditedAt.Equal(ts.Add(time.Minute)) || e.ChatJID != "120363001@g.us" {
+		e.Body != "düzeltildi" || !e.EditedAt.Equal(ts.Add(-time.Second)) || e.ChatJID != "120363001@g.us" {
 		t.Fatalf("edit = %+v", e)
+	}
+	// The sender's own edit time never lies after the server's.
+	future := groupMsg(&waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{Type: waE2E.ProtocolMessage_MESSAGE_EDIT.Enum(), Key: key,
+		TimestampMS: proto.Int64(ts.AddDate(10, 0, 0).UnixMilli()), EditedMessage: &waE2E.Message{Conversation: proto.String("x")}}})
+	if e := one(t, a.normalizeMessage(future, domain.SourceLive)).(domain.MessageEdited); !e.EditedAt.Equal(ts) {
+		t.Fatalf("a future edit time = %v, want the server's %v", e.EditedAt, ts)
 	}
 	if e := one(t, a.normalizeMessage(edit, domain.SourceLive)).(domain.MessageEdited); e.Actor != "101@lid" {
 		t.Fatalf("an edit names who made it: %+v", e)
@@ -147,16 +153,34 @@ func TestNormalizeEditsRevokesReactions(t *testing.T) {
 		t.Fatalf("an admin revoke is marked: %+v", e)
 	}
 	react := groupMsg(&waE2E.Message{ReactionMessage: &waE2E.ReactionMessage{Key: key, Text: proto.String("+1"),
-		SenderTimestampMS: proto.Int64(ts.Add(2 * time.Second).UnixMilli())}})
+		SenderTimestampMS: proto.Int64(ts.Add(-2 * time.Second).UnixMilli())}})
 	if e := one(t, a.normalizeMessage(react, domain.SourceLive)).(domain.ReactionReceived); e.TargetWAID != "TARGET" ||
-		e.Emoji != "+1" || e.SenderJID != "101@lid" || !e.Timestamp.Equal(ts.Add(2*time.Second)) {
+		e.Emoji != "+1" || e.SenderJID != "101@lid" || !e.Timestamp.Equal(ts.Add(-2*time.Second)) {
 		t.Fatalf("reaction = %+v", e)
 	}
-	ephemeral := groupMsg(&waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{Type: waE2E.ProtocolMessage_EPHEMERAL_SETTING.Enum(),
-		EphemeralExpiration: proto.Uint32(604800)}})
-	if e := one(t, a.normalizeMessage(ephemeral, domain.SourceLive)).(domain.ChatUpdated); e.EphemeralTimer != 7*24*time.Hour ||
+	react.Message.ReactionMessage.SenderTimestampMS = proto.Int64(ts.AddDate(5, 0, 0).UnixMilli())
+	if e := one(t, a.normalizeMessage(react, domain.SourceLive)).(domain.ReactionReceived); !e.Timestamp.Equal(ts) {
+		t.Fatalf("a future reaction time = %v, want the server's", e.Timestamp)
+	}
+	timer := func(secs uint32) *events.Message {
+		return groupMsg(&waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{Type: waE2E.ProtocolMessage_EPHEMERAL_SETTING.Enum(),
+			EphemeralExpiration: proto.Uint32(secs)}})
+	}
+	// In a group, any member can send it: the server's group info sets
+	// the timer instead.
+	if evs := a.normalizeMessage(timer(604800), domain.SourceLive); len(evs) != 0 {
+		t.Fatalf("a group member set the group's timer: %+v", evs)
+	}
+	direct := timer(604800)
+	direct.Info.Chat, direct.Info.IsGroup = aliJID, false
+	if e := one(t, a.normalizeMessage(direct, domain.SourceLive)).(domain.ChatUpdated); e.EphemeralTimer != 7*24*time.Hour ||
 		!e.Fields.Has(domain.ChatFieldEphemeral) {
 		t.Fatalf("ephemeral = %+v", e)
+	}
+	odd := timer(1)
+	odd.Info.Chat, odd.Info.IsGroup = aliJID, false
+	if evs := a.normalizeMessage(odd, domain.SourceLive); len(evs) != 0 {
+		t.Fatalf("a one-second timer is not one WhatsApp offers: %+v", evs)
 	}
 	for name, m := range map[string]*waE2E.Message{
 		"history notice": {ProtocolMessage: &waE2E.ProtocolMessage{Type: waE2E.ProtocolMessage_HISTORY_SYNC_NOTIFICATION.Enum()}},

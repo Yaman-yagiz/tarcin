@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"runtime"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -160,7 +161,7 @@ func (a *Adapter) handle(ctx context.Context, sink backend.Sink, evt any) (ok bo
 	defer func() {
 		if r := recover(); r != nil {
 			a.opts.Log.Error("event handler panicked; the event is not acknowledged",
-				"event", fmt.Sprintf("%T", evt), "panic", fmt.Sprint(r), "stack", string(debug.Stack()))
+				"event", fmt.Sprintf("%T", evt), "panic", panicText(r), "stack", string(debug.Stack()))
 			ok = false
 		}
 	}()
@@ -653,4 +654,13 @@ func (a *Adapter) MarkRead(ctx context.Context, chat, sender domain.JID, ids []d
 		return fmt.Errorf("sending read receipts: %w", err)
 	}
 	return nil
+}
+
+// panicText describes a recovered panic without its value, which may hold
+// message content: a runtime error's text, or the value's type.
+func panicText(r any) string {
+	if re, ok := r.(runtime.Error); ok {
+		return re.Error()
+	}
+	return fmt.Sprintf("%T", r)
 }

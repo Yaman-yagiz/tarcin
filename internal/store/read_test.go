@@ -119,7 +119,7 @@ func TestReaderIdentities(t *testing.T) {
 	if all[0] != want {
 		t.Fatalf("identity = %+v, want %+v", all[0], want)
 	}
-	if all[1].LID != "" || all[1].DisplayName() != "+90556" || all[2].DisplayName() != "Ayşe" {
+	if all[1].LID != "" || all[1].DisplayName() != "+90556" || all[2].DisplayName() != "~Ayşe" {
 		t.Fatalf("identities = %+v", all)
 	}
 	some, err := r.IdentitiesByID(t.Context(), []domain.IdentityID{3, 7})

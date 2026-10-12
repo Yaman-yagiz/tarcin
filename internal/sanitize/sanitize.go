@@ -172,6 +172,16 @@ func clean(s string, line bool) string {
 			// Dropped from names; harmless and sometimes needed in bodies.
 		case line && unicode.IsSpace(r):
 			space()
+		case unicode.Is(unicode.Cf, r):
+			// A format character (the joiner in an emoji sequence, say)
+			// is no base: marks on both sides of it are one run, or
+			// joiners between them would lift the cap.
+			if pendingSpace {
+				b.WriteByte(' ')
+				pendingSpace = false
+				marks = 0
+			}
+			b.WriteRune(r)
 		default:
 			writeBase(r)
 		}

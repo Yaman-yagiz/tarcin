@@ -69,8 +69,12 @@ Select the message with `j` and `k` in the chat (the status line then
 shows `o open · s save`). `o` downloads and opens a photo, video, voice
 message or document with `xdg-open`, or with a program you choose per
 type (see [configuration](configuration.md)). `s` saves a copy to your downloads
-folder; it never replaces a file. To send a file, type a caption if you
-like, then `:attach ~/Pictures/` and press `tab` to complete the name.
+folder; it never replaces a file. A file of a type tarcin does not
+know is not opened, since your system would guess its type from its
+content; save it with `s` instead, or set an opener for its type.
+
+To send a file, type a caption if you like, then `:attach ~/Pictures/`
+and press `tab` to complete the name.
 
 ## Search
 

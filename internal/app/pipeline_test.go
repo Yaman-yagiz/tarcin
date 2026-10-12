@@ -346,7 +346,7 @@ func TestPipelineUpdatesRowsAndMerges(t *testing.T) {
 	}
 	waitUntil(t, "the row", func() bool {
 		row, ok := r.row(id)
-		return ok && row.Title == "Ali" && !row.PinnedAt.IsZero() && row.Muted && row.Unread == 1
+		return ok && row.Title == "~Ali" && !row.PinnedAt.IsZero() && row.Muted && row.Unread == 1 // a push name, marked
 	})
 
 	// A person seen by number and by LID before the link: two chats
