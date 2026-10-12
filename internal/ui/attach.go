@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/Yaman-yagiz/tarcin/internal/domain"
+	"github.com/Yaman-yagiz/tarcin/internal/sanitize"
 )
 
 // AttachResultMsg reports whether an attachment was queued for sending.
@@ -126,11 +127,12 @@ func (m *Model) completed(msg pathCompletionMsg) {
 	}
 	m.input.SetValue(msg.completed)
 	m.input.CursorEnd()
+	m.choices = ""
 	if len(msg.choices) > 1 {
 		shown := msg.choices[:min(len(msg.choices), maxChoices)]
-		m.notice = strings.Join(shown, "  ")
+		m.choices = sanitize.Line(strings.Join(shown, "  ")) // local file names, but any bytes
 		if len(msg.choices) > maxChoices {
-			m.notice += "  …"
+			m.choices += "  …"
 		}
 	}
 }

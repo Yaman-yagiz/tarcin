@@ -294,6 +294,16 @@ func (r *Reader) IdentitiesByID(ctx context.Context, ids []domain.IdentityID) ([
 		WHERE id IN (SELECT value FROM json_each(?)) ORDER BY id`, idList(ids))
 }
 
+// Contacts returns up to limit people of the account's address book whose
+// name contains query, compared as search compares (textfold): names that
+// start with it first, then by name.
+func (r *Reader) Contacts(ctx context.Context, query string, limit int) ([]domain.Identity, error) {
+	return r.identities(ctx, `SELECT `+identityColumns+` FROM identities
+		WHERE contact_name IS NOT NULL AND is_me = 0 AND instr(textfold(contact_name), ?1) > 0
+		ORDER BY instr(textfold(contact_name), ?1) != 1, textfold(contact_name), id LIMIT ?2`,
+		textfold.Fold(query), limit)
+}
+
 func (r *Reader) identities(ctx context.Context, query string, args ...any) ([]domain.Identity, error) {
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {

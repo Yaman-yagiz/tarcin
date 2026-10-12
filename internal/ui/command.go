@@ -56,6 +56,7 @@ func (m *Model) startInput(md mode) {
 }
 
 func (m *Model) endInput() {
+	m.choices = ""
 	if m.mode == modeSearch {
 		m.chats.SetFilter("")
 	}
@@ -86,8 +87,12 @@ func (m *Model) handleInputKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.execute(line)
 	}
 	if m.mode == modeCommand && msg.String() == "tab" {
-		return completeAttach(m.input.Value())
+		if cmd := completeAttach(m.input.Value()); cmd != nil {
+			return cmd
+		}
+		return m.completeContact(m.input.Value())
 	}
+	m.choices = "" // the line changes: its completion no longer applies
 	if m.mode == modeSearch {
 		switch msg.String() {
 		case "down", "ctrl+n":
@@ -168,6 +173,8 @@ func (m *Model) execute(line string) tea.Cmd {
 		return m.findCommand(arg, false)
 	case "findin":
 		return m.findCommand(arg, true)
+	case "new":
+		return m.startChat(arg)
 	case "open":
 		if arg == "" {
 			m.notice = "usage: :open NAME"

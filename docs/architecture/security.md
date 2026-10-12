@@ -184,6 +184,9 @@ so. The product rules are:
 - No background enumeration of groups, contacts or presence beyond what
   the official clients do.
 - Protocol requests from background jobs are rate-limited.
+- A phone number is looked up on the server only when the user types it
+  to start a chat (`:new +NUMBER`), one number per command, as the
+  official clients do; numbers are never looked up in bulk.
 - Privacy toggles exist for read receipts, typing indicators and
   presence: `privacy.read_receipts`, `privacy.typing` and
   `privacy.presence` in `config.toml`, all on by default as in WhatsApp.

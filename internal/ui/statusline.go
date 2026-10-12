@@ -63,8 +63,18 @@ func (m *Model) statusLine(w int) string {
 	rest := max(w-method.StringWidth(badge), 0)
 
 	if m.mode == modeCommand || m.mode == modeSearch {
-		m.input.SetWidth(max(rest-2-method.StringWidth(m.input.Prompt), 1))
-		return uikit.Fit(method, badge+" "+m.input.View(), w)
+		width := max(rest-2-method.StringWidth(m.input.Prompt), 1)
+		// A completion's choices follow the command line while it is open.
+		var choices string
+		if m.mode == modeCommand && m.choices != "" {
+			need := method.StringWidth(m.input.Value()) + 1
+			if room := width - need - 2; room >= 10 {
+				width = need
+				choices = "  " + t.Muted.Render(uikit.Truncate(method, m.choices, room, "…"))
+			}
+		}
+		m.input.SetWidth(width)
+		return uikit.Fit(method, badge+" "+m.input.View()+choices, w)
 	}
 	if m.mode == modeReact {
 		return uikit.Fit(method, badge+" "+uikit.Display(method, reactPrompt()), w)
@@ -89,7 +99,7 @@ func (m *Model) statusLine(w int) string {
 		segs = append(segs, strings.Join(p, " ")+"…")
 	}
 	if m.notice != "" {
-		segs = append(segs, "! "+m.notice)
+		segs = append(segs, "! "+sanitize.Line(m.notice)) // notices may quote names from the network
 	}
 	right := " ? help "
 	if hint := m.selectedMediaHint(); hint != "" {

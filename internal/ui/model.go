@@ -90,6 +90,13 @@ type Options struct {
 	// NotifyFocused notifies while the terminal has focus too, for every
 	// chat but the open one. False: only while it does not.
 	NotifyFocused bool
+	// StartChat finds or creates the direct chat with a contact, by name,
+	// or with a phone number, for :new; the command reports a
+	// ChatStartedMsg. Contacts lists the contacts whose names match, for
+	// completing :new; the command reports a ContactsMsg. Nil disables
+	// them.
+	StartChat func(query string) tea.Cmd
+	Contacts  func(query string) tea.Cmd
 	// Attach queues a file to send to a chat, with out's text as its
 	// caption; it returns the command that does so, which reports an
 	// AttachResultMsg. Nil disables it.
@@ -191,6 +198,9 @@ type Model struct {
 	termFocus                int8
 	attentionFn              func(bool) tea.Cmd
 	notifyFocused            bool
+	startChatFn              func(string) tea.Cmd
+	choices                  string // a completion's matches, shown beside the command line
+	contactsFn               func(string) tea.Cmd
 	saveMediaFn              func(domain.Message) tea.Cmd
 	presenceFn               func(bool) tea.Cmd
 	available                bool
@@ -293,6 +303,8 @@ func New(opts Options) *Model {
 		notifyFn:       opts.Notify,
 		attentionFn:    opts.Attention,
 		notifyFocused:  opts.NotifyFocused,
+		startChatFn:    opts.StartChat,
+		contactsFn:     opts.Contacts,
 		settingFn:      opts.ChatSetting,
 		deleteLocalFn:  opts.DeleteLocal,
 		metricsFn:      opts.Metrics,
@@ -413,6 +425,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pathCompletionMsg:
 		m.completed(msg)
 		return m, nil
+	case ContactsMsg:
+		m.completedContacts(msg)
+		return m, nil
+	case ChatStartedMsg:
+		cmd := m.chatStarted(msg)
+		return m, cmd
 	case MetricsMsg:
 		m.metrics = msg.Sections
 		return m, nil

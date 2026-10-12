@@ -34,8 +34,9 @@ hundreds of thousands of messages.
   fetched on demand as you scroll back
 - **Search** across every chat, ignoring case and accents, and
   Turkish-aware (`kadin` finds `Kadın`)
-- **Chats**: unread counts, pinned, muted and archived chats synced with
-  your phone, disappearing messages, group member lists
+- **Chats**: start one with a contact or a phone number; unread counts,
+  pinned, muted and archived chats synced with your phone, disappearing
+  messages, group member lists
 - **Privacy settings** for read receipts, typing indicators and online
   status; tarcin is online only while you are active
 - **Desktop notifications** over D-Bus that respect focus and muted chats

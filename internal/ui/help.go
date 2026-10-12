@@ -58,6 +58,7 @@ var contextHelp = map[keymap.Context]string{
 var commandHelp = [][2]string{
 	{":quit, :q", "quit"},
 	{":open NAME", "open the first chat whose name matches"},
+	{":new NAME, :new +NUMBER", "start a chat with a contact (tab completes) or a phone number"},
 	{":search TEXT", "filter the chat list (also / or ctrl+k)"},
 	{":archived", "show or hide archived chats"},
 	{":members", "show the members of the open group"},

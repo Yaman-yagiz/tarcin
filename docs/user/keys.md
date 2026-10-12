@@ -20,6 +20,7 @@ other new-line keys work everywhere.
 | Command | Does |
 |---|---|
 | `:open NAME` | open the first chat whose name matches |
+| `:new NAME`, `:new +NUMBER` | start a chat with a contact (`tab` completes the name) or a phone number |
 | `:search TEXT` | filter the chat list |
 | `:find WORDS`, `:findin WORDS` | search the messages of all chats, or of the open one |
 | `:attach PATH` | send a file, with the composer's text as caption (`tab` completes the path) |

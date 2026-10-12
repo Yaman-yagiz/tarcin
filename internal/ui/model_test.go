@@ -809,6 +809,69 @@ func (f findSource) Search(context.Context, string, domain.ChatID, int) ([]domai
 	return f.msgs, nil
 }
 
+func TestNewChatFlow(t *testing.T) {
+	contacts := []string{"Ayşe Kaya", "Ayşe Kaya Demir", "Mert \x1b[31mŞahin"}
+	var started []string
+	m := New(Options{History: emptyHistory{},
+		Contacts: func(q string) tea.Cmd {
+			return func() tea.Msg {
+				var names []string
+				for _, c := range contacts {
+					if strings.Contains(strings.ToLower(c), strings.ToLower(q)) || strings.HasPrefix(c, "Ayşe") && q == "ays" {
+						names = append(names, c)
+					}
+				}
+				return ContactsMsg{Query: q, Names: names}
+			}
+		},
+		StartChat: func(q string) tea.Cmd {
+			started = append(started, q)
+			return func() tea.Msg {
+				return ChatStartedMsg{Row: chatlist.Row{ID: 9, Title: "Mert Şahin", LastActivity: time.Now()}}
+			}
+		}})
+	size(m, 120, 30)
+	m.Update(chatlist.LoadMsg{Rows: []chatlist.Row{{ID: 1, Title: "Aile", LastActivity: time.Now()}}})
+
+	// Tab completes to what the matches share, and lists them.
+	m.Update(key(":"))
+	typeKeys(m, "new ays")
+	_, cmd := m.Update(key("tab"))
+	runCmd(m, cmd)
+	if m.input.Value() != "new Ayşe Kaya" || !strings.Contains(statusOf(m), "Ayşe Kaya  Ayşe Kaya Demir") {
+		t.Fatalf("input %q, status %q", m.input.Value(), statusOf(m))
+	}
+	// One match is completed whole, sanitized: names come from the phone.
+	m.input.SetValue("new mert")
+	_, cmd = m.Update(key("tab"))
+	runCmd(m, cmd)
+	if m.input.Value() != "new Mert Şahin" {
+		t.Fatalf("input %q", m.input.Value())
+	}
+	_, cmd = m.Update(key("enter"))
+	runCmd(m, cmd)
+	if len(started) != 1 || started[0] != "Mert Şahin" {
+		t.Fatalf("started %q", started)
+	}
+	// The new chat joins the list and opens.
+	if id, ok := m.chats.Selected(); !ok || id != 9 || m.header != "Mert Şahin" || m.msgs.Chat() != 9 {
+		t.Fatalf("selected %d, header %q, open %d", id, m.header, m.msgs.Chat())
+	}
+
+	m.Update(key(":"))
+	typeKeys(m, "new")
+	_, cmd = m.Update(key("enter"))
+	runCmd(m, cmd)
+	if !strings.Contains(statusOf(m), "usage: :new") || len(started) != 1 {
+		t.Fatalf("status %q", statusOf(m))
+	}
+	// A notice never carries control sequences into the terminal.
+	m.notice = "x\x1b]0;title\x07y"
+	if strings.Contains(m.View().Content, "\x1b]0;") {
+		t.Fatal("the notice reached the terminal unsanitized")
+	}
+}
+
 func TestFindFlow(t *testing.T) {
 	src := findSource{msgs: []domain.Message{{ChatID: 2, WAID: "W9", Body: "kahve?", Timestamp: time.Now()}}}
 	m := New(Options{History: emptyHistory{}, Search: src})

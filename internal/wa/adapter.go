@@ -441,6 +441,46 @@ func (a *Adapter) FetchGroup(ctx context.Context, chat domain.JID) ([]domain.Eve
 	return groupEvents(info), nil
 }
 
+var _ backend.NumberResolver = (*Adapter)(nil)
+
+// ResolveNumber implements backend.NumberResolver with one contact query
+// (IsOnWhatsApp, LID addressing), as the official clients make when a
+// number is typed in.
+func (a *Adapter) ResolveNumber(ctx context.Context, phone string) (domain.JID, []domain.Event, error) {
+	if !a.cli.IsConnected() {
+		return "", nil, backend.ErrNotConnected
+	}
+	res, err := a.cli.IsOnWhatsApp(ctx, []string{"+" + phone})
+	if err != nil {
+		return "", nil, fmt.Errorf("looking up the number: %w", err)
+	}
+	return numberResult(res)
+}
+
+// numberResult reads the answer to a lookup of one number: the account's
+// LID when the server tells it, else its phone-number JID.
+func numberResult(res []types.IsOnWhatsAppResponse) (domain.JID, []domain.Event, error) {
+	if len(res) == 0 || !res[0].IsIn {
+		return "", nil, backend.ErrNotOnWhatsApp
+	}
+	r := res[0]
+	jid, pn := r.JID, r.PhoneNumber
+	if pn.IsEmpty() && jid.Server == types.DefaultUserServer {
+		pn = jid
+	}
+	var evs []domain.Event
+	if jid.Server == types.HiddenUserServer && !pn.IsEmpty() {
+		evs = append(evs, domain.IdentityLinked{PN: fromJID(pn.ToNonAD()), LID: fromJID(jid.ToNonAD())})
+	}
+	if jid.IsEmpty() {
+		jid = pn
+	}
+	if jid.IsEmpty() {
+		return "", nil, backend.ErrNotOnWhatsApp
+	}
+	return fromJID(jid.ToNonAD()), evs, nil
+}
+
 var _ backend.HistoryRequester = (*Adapter)(nil)
 
 // RequestHistory implements backend.HistoryRequester with a peer message

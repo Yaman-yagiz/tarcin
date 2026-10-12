@@ -119,6 +119,21 @@ type HistoryAnchor struct {
 	Timestamp time.Time
 }
 
+// ErrNotOnWhatsApp is returned for a phone number that has no WhatsApp
+// account.
+var ErrNotOnWhatsApp = errors.New("backend: this number is not on WhatsApp")
+
+// NumberResolver is implemented by backends that can look up who uses a
+// phone number, to start a chat with someone not in any chat yet. It is
+// called once per number the user types, never in bulk.
+type NumberResolver interface {
+	// ResolveNumber returns the address of the account that uses phone,
+	// in international format without the "+", and events that link its
+	// address forms (IdentityLinked). It returns ErrNotOnWhatsApp if no
+	// account uses the number.
+	ResolveNumber(ctx context.Context, phone string) (domain.JID, []domain.Event, error)
+}
+
 // HistoryRequester is implemented by backends that can ask the phone for
 // a chat's older messages.
 type HistoryRequester interface {

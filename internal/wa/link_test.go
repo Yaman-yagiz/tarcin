@@ -122,3 +122,21 @@ func TestLinkerInputs(t *testing.T) {
 		t.Errorf("linked device: %v", err)
 	}
 }
+
+func TestNumberResult(t *testing.T) {
+	lid, pn := types.NewJID("77", types.HiddenUserServer), types.NewJID("905551112233", types.DefaultUserServer)
+	jid, evs, err := numberResult([]types.IsOnWhatsAppResponse{{JID: lid, PhoneNumber: pn, IsIn: true}})
+	if err != nil || jid != "77@lid" || len(evs) != 1 || evs[0] != (domain.IdentityLinked{PN: "905551112233@s.whatsapp.net", LID: "77@lid"}) {
+		t.Fatalf("with a LID: %q, %v, %v", jid, evs, err)
+	}
+	// Without a LID the phone-number JID addresses the chat.
+	jid, evs, err = numberResult([]types.IsOnWhatsAppResponse{{JID: pn, IsIn: true}})
+	if err != nil || jid != "905551112233@s.whatsapp.net" || len(evs) != 0 {
+		t.Fatalf("without a LID: %q, %v, %v", jid, evs, err)
+	}
+	for _, res := range [][]types.IsOnWhatsAppResponse{nil, {{JID: lid, PhoneNumber: pn, IsIn: false}}, {{IsIn: true}}} {
+		if _, _, err := numberResult(res); !errors.Is(err, backend.ErrNotOnWhatsApp) {
+			t.Fatalf("%+v: err = %v", res, err)
+		}
+	}
+}

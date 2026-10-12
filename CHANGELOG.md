@@ -90,6 +90,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runs.
 - Storage and load benchmarks for the performance budgets
   (`make storagebench`, `make loadtest`).
+- `:new NAME` starts a chat with a contact of your address book, and
+  `:new +NUMBER` with a phone number, which is checked with WhatsApp
+  first; `tab` completes contact names. A chat that exists just opens.
 
 ### Changed
 
@@ -102,6 +105,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sudo make install` no longer builds as root, which left root-owned
   files in `./build`: `make` builds everything it installs, as the user,
   and `make install` only copies.
+- The choices of a `tab` completion (`:attach` paths) show beside the
+  command line; they stayed hidden until it closed.
 - The open chat no longer marks new messages read, or sends read
   receipts, while the terminal does not have focus; it is read when you
   come back.

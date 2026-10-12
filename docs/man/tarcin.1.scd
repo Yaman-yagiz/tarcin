@@ -135,6 +135,8 @@ previous chat with unread messages. Every key can be changed; see
 
 |[ *:open* _name_
 :[ open the first chat whose name matches
+|  *:new* _name_, *:new* _+number_
+:[ start a chat with a contact (*tab* completes the name) or a phone number
 |  *:search* _text_
 :[ filter the chat list (also */* or *ctrl+k*)
 |  *:find* _words_, *:findin* _words_

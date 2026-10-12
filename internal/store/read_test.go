@@ -128,6 +128,43 @@ func TestReaderIdentities(t *testing.T) {
 	}
 }
 
+func TestReaderContacts(t *testing.T) {
+	w, r := readFixture(t)
+	mustExec(t, w, `INSERT INTO identities (id, lid, pn, contact_name, push_name, is_me, updated_at) VALUES
+		(1, '1@lid', NULL, 'Ayşe Kaya', NULL, 0, 0),
+		(2, '2@lid', NULL, 'Elif Ayşegül', NULL, 0, 0),
+		(3, '3@lid', NULL, 'AYSE Demir', NULL, 0, 0),
+		(4, '4@lid', NULL, NULL, 'Ayşe Push', 0, 0),
+		(5, '5@lid', NULL, 'Ayşe Me', NULL, 1, 0),
+		(6, '6@lid', NULL, 'Mert', NULL, 0, 0)`)
+	names := func(query string, limit int) []string {
+		t.Helper()
+		got, err := r.Contacts(t.Context(), query, limit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, id := range got {
+			out = append(out, id.ContactName)
+		}
+		return out
+	}
+	// Matching ignores case and accents; names that start with the query
+	// come first. Push names and this account are not contacts.
+	if got := names("ayse", 10); !slices.Equal(got, []string{"AYSE Demir", "Ayşe Kaya", "Elif Ayşegül"}) {
+		t.Fatalf("contacts = %q", got)
+	}
+	if got := names("ayse", 1); !slices.Equal(got, []string{"AYSE Demir"}) {
+		t.Fatalf("limit 1 = %q", got)
+	}
+	if got := names("zz", 10); len(got) != 0 {
+		t.Fatalf("no match = %q", got)
+	}
+	if got := names("", 10); len(got) != 4 {
+		t.Fatalf("an empty query lists every contact: %q", got)
+	}
+}
+
 // pageFixture inserts n messages into chat 1, three per timestamp so
 // that pages must break ties by ID, and noise into chat 2.
 func pageFixture(t *testing.T, w *sql.DB, n int) {

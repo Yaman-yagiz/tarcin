@@ -81,6 +81,11 @@ opens a result's chat at the message.
 
 ## Chats
 
+`:new` starts a chat with someone you have not written to yet: a
+contact by name (`:new ay` and `tab` complete it), or a phone number
+with its country code (`:new +90 555 123 45 67`), which tarcin checks
+with WhatsApp first. A chat that exists already just opens.
+
 `:mute 8h` (or `1w`, `always`), `:pin` and `:archive` change the open
 chat on all your devices; `:unmute`, `:unpin` and `:unarchive` undo
 them, and `:archived` shows archived chats. `:members` shows a group's
