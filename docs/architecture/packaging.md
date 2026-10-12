@@ -23,8 +23,10 @@ with `-X` at link time, falling back to `runtime/debug.ReadBuildInfo()`.
 a command-line `-ldflags` replaces the one in `GOFLAGS` and would
 otherwise silently drop full RELRO (see the
 [Go package guidelines](https://wiki.archlinux.org/title/Go_package_guidelines)). Builds never
-embed the wall-clock time. `Date` comes from `SOURCE_DATE_EPOCH`, or from
-the commit time.
+embed the wall-clock time of their own: `Date` comes from
+`SOURCE_DATE_EPOCH`, or from the commit time. (makepkg sets
+`SOURCE_DATE_EPOCH` to the time a build starts, which `makerepropkg`
+reproduces.)
 
 ### Makefile contract
 
@@ -36,7 +38,10 @@ The Makefile is a convenience for developers only. Packagers call
   `make install DESTDIR=… PREFIX=/usr`, which only copies, so that it
   never builds as root.
 - It **respects** caller-supplied `GOFLAGS`, `CGO_*FLAGS` and `LDFLAGS`,
-  and never overwrites them.
+  and never overwrites them. Unless the caller sets them, `make build`
+  links a PIE (`-buildmode=pie`) with full RELRO
+  (`CGO_LDFLAGS=-Wl,-z,relro,-z,now`), so a `make install`ed binary is
+  as hardened as the packages.
 
 ## 2. Installed files
 
@@ -118,9 +123,13 @@ the first signed release exists (`updpkgsums`).
 `archlinux:base-devel` container, as an unprivileged user: the release
 package from a `git archive` in place of the tarball, without its
 checksums and signature, and the git package from a local copy. It runs
-`namcap` on each PKGBUILD and package, checks the binary for PIE, full
-RELRO and NX, checks the installed files, and fails if a `.SRCINFO` is
-stale.
+`namcap` on each PKGBUILD and package and fails on any error or
+warning it reports (namcap itself exits 0), checks the binary for PIE,
+full RELRO and NX, checks the installed files, and fails if a
+`.SRCINFO` is stale. Both PKGBUILDs set `GOTOOLCHAIN=local`, so a build
+never downloads a toolchain; the release one also sets
+`-buildvcs=false`, since its tarball has no `.git` and Go would stamp
+the commit of the AUR clone it is built in.
 
 ### Pre-publish checklist
 
@@ -186,8 +195,8 @@ line rather than a personal identity.
   the bump gets tested.
 - **Go security releases** trigger a `pkgrel` bump in the AUR, because
   Go binaries embed the stdlib.
-- **Steps**, for the maintainer, whose PGP key signs the tag and the
-  artifacts:
+- **Steps**, for the maintainer, whose OpenPGP key
+  (`git config user.signingkey`) signs the tag and the artifacts:
   1. Test the commit to be released on a real account: linking,
      history sync, sending and receiving, media, and logout.
   2. In `CHANGELOG.md`, rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`

@@ -12,9 +12,9 @@ pkgbase = tarcin-git
 	depends = glibc
 	depends = sqlite
 	optdepends = xdg-utils: open media with the default application
-	optdepends = notification-daemon: desktop notifications
 	provides = tarcin=0.0.0.r0.g0000000
 	conflicts = tarcin
+	options = !debug
 	source = tarcin::git+https://github.com/Yaman-yagiz/tarcin.git
 	b2sums = SKIP
 

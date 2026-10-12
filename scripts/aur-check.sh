@@ -51,10 +51,10 @@ exec "$runtime" run --rm \
 			for d in rel git; do
 				echo "==> $d"
 				cd ~/"$d"
-				namcap PKGBUILD
+				namcap PKGBUILD | tee -a ~/namcap.log
 				makepkg --noconfirm --cleanbuild
 				pkg=$(ls ./*.pkg.tar.zst | grep -v -- -debug-) # makepkg also makes a debug package
-				namcap "$pkg"
+				namcap "$pkg" | tee -a ~/namcap.log
 				bin=$(mktemp)
 				bsdtar -xOf "$pkg" usr/bin/tarcin >"$bin"
 				readelf -hW "$bin" | grep -q "DYN (Position-Independent Executable file)" || { echo "not a PIE"; exit 1; }
@@ -72,6 +72,11 @@ exec "$runtime" run --rm \
 				chmod +x "$bin"
 				"$bin" --version
 			done
+			# namcap exits 0 whatever it finds: its errors and warnings fail here.
+			if grep -E " (E|W): " ~/namcap.log; then
+				echo "aur-check: namcap reported the problems above"
+				exit 1
+			fi
 			echo "aur-check: both packages built and passed namcap"
 BUILD
 	'

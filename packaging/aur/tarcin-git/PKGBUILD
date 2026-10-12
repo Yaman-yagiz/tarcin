@@ -12,8 +12,9 @@ depends=('glibc' 'sqlite')
 makedepends=('git' 'go' 'scdoc')
 provides=("$_pkgname=$pkgver")
 conflicts=("$_pkgname")
-optdepends=('xdg-utils: open media with the default application'
-            'notification-daemon: desktop notifications')
+optdepends=('xdg-utils: open media with the default application')
+# Go builds with -trimpath leave the debug package without sources.
+options=('!debug')
 source=("$_pkgname::git+$url.git")
 b2sums=('SKIP')
 
@@ -39,13 +40,14 @@ build() {
   export CGO_CXXFLAGS="$CXXFLAGS"
   export CGO_LDFLAGS="$LDFLAGS"
   export GOPATH="$srcdir/gopath"
+  export GOTOOLCHAIN=local
   export GOFLAGS='-buildmode=pie -trimpath -mod=readonly -modcacherw'
   local _bi=github.com/Yaman-yagiz/tarcin/internal/buildinfo
   local _date
   _date=$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)
   go build -tags libsqlite3 -o build/tarcin \
     -ldflags "-linkmode=external -X $_bi.Version=$pkgver -X $_bi.Commit=$(git rev-parse --short=12 HEAD) -X $_bi.Date=$_date" ./cmd/tarcin
-  make man
+  make BUILDDIR=build man # makepkg may export its own BUILDDIR
   ./build/tarcin config print-defaults > build/config.example.toml
 }
 
@@ -56,6 +58,7 @@ check() {
   export CGO_CXXFLAGS="$CXXFLAGS"
   export CGO_LDFLAGS="$LDFLAGS"
   export GOPATH="$srcdir/gopath"
+  export GOTOOLCHAIN=local
   export GOFLAGS='-buildmode=pie -trimpath -mod=readonly -modcacherw'
   go test -tags libsqlite3 ./...
 }

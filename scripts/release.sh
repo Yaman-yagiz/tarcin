@@ -39,7 +39,10 @@ fi
 grep -Eq "^## \[$version\] - [0-9]{4}-[0-9]{2}-[0-9]{2}\$" CHANGELOG.md ||
 	die "CHANGELOG.md has no '## [$version] - YYYY-MM-DD' section"
 [ -f "$notes" ] || die "$notes is missing"
-git config --get user.signingkey >/dev/null || die "git has no user.signingkey: the tag must be signed"
+key=$(git config --get user.signingkey) || die "git has no user.signingkey: the tag must be signed"
+# makepkg checks the tarball against validpgpkeys, so tag and files are
+# signed with the same OpenPGP key.
+[ "$(git config --get gpg.format || echo openpgp)" = openpgp ] || die "the tag must be signed with OpenPGP (gpg.format)"
 command -v gpg >/dev/null || die "gpg is needed to sign the tarball"
 
 make ci
@@ -52,8 +55,8 @@ mkdir -p dist
 rm -f "dist/$name.tar.gz" "dist/$name.tar.gz.sig" dist/SHA256SUMS dist/SHA256SUMS.sig
 git archive --format=tar.gz --prefix="$name/" -o "dist/$name.tar.gz" "$tag"
 (cd dist && sha256sum "$name.tar.gz" >SHA256SUMS)
-gpg --detach-sign "dist/$name.tar.gz"
-gpg --detach-sign dist/SHA256SUMS
+gpg --local-user "$key" --detach-sign "dist/$name.tar.gz"
+gpg --local-user "$key" --detach-sign dist/SHA256SUMS
 gpg --verify "dist/$name.tar.gz.sig" "dist/$name.tar.gz"
 gpg --verify dist/SHA256SUMS.sig dist/SHA256SUMS
 

@@ -9,8 +9,9 @@ url='https://github.com/Yaman-yagiz/tarcin'
 license=('GPL-3.0-or-later')
 depends=('glibc' 'sqlite')
 makedepends=('go' 'scdoc')
-optdepends=('xdg-utils: open media with the default application'
-            'notification-daemon: desktop notifications')
+optdepends=('xdg-utils: open media with the default application')
+# Go builds with -trimpath leave the debug package without sources.
+options=('!debug')
 source=("$url/releases/download/v$pkgver/$pkgname-$pkgver.tar.gz"{,.sig})
 # Filled in by updpkgsums for the release, with the release key's
 # fingerprint in validpgpkeys.
@@ -29,13 +30,16 @@ build() {
   export CGO_CXXFLAGS="$CXXFLAGS"
   export CGO_LDFLAGS="$LDFLAGS"
   export GOPATH="$srcdir/gopath"
-  export GOFLAGS='-buildmode=pie -trimpath -mod=readonly -modcacherw'
+  export GOTOOLCHAIN=local
+  # The tarball has no .git: -buildvcs=false keeps Go from stamping the
+  # commit of the AUR clone it is built in.
+  export GOFLAGS='-buildmode=pie -trimpath -buildvcs=false -mod=readonly -modcacherw'
   local _bi=github.com/Yaman-yagiz/tarcin/internal/buildinfo
   local _date
   _date=$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)
   go build -tags libsqlite3 -o build/tarcin \
     -ldflags "-linkmode=external -X $_bi.Version=$pkgver -X $_bi.Date=$_date" ./cmd/tarcin
-  make man
+  make BUILDDIR=build man # makepkg may export its own BUILDDIR
   ./build/tarcin config print-defaults > build/config.example.toml
 }
 
@@ -46,7 +50,8 @@ check() {
   export CGO_CXXFLAGS="$CXXFLAGS"
   export CGO_LDFLAGS="$LDFLAGS"
   export GOPATH="$srcdir/gopath"
-  export GOFLAGS='-buildmode=pie -trimpath -mod=readonly -modcacherw'
+  export GOTOOLCHAIN=local
+  export GOFLAGS='-buildmode=pie -trimpath -buildvcs=false -mod=readonly -modcacherw'
   go test -tags libsqlite3 ./...
 }
 

@@ -4,6 +4,11 @@
 # protocol changes. By default it takes the newest commit on
 # whatsmeow's main that is at least two weeks old (security.md §6); a
 # manual run can name any ref, for a ClientOutdated emergency.
+#
+# The new code runs only in the test job, which has a read-only token and
+# keeps no credentials in its checkout. The job that pushes and opens the
+# pull request runs no module code: go get and go mod tidy only resolve
+# and download.
 name: Bump whatsmeow
 
 on:
@@ -23,19 +28,23 @@ env:
   GOTOOLCHAIN: local
 
 jobs:
-  bump:
+  test:
     runs-on: ubuntu-latest
     container: archlinux:base-devel
     timeout-minutes: 30
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
+    outputs:
+      ref: ${{ steps.choose.outputs.ref }}
+      version: ${{ steps.bump.outputs.version }}
     steps:
       - name: Install toolchain
         run: pacman -Syu --noconfirm --needed go git github-cli sqlite
 
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Choose the commit
         id: choose
@@ -66,20 +75,45 @@ jobs:
           go test -tags sqlite_fts5 ./...
           echo "version=$(go list -m -f '{{.Version}}' go.mau.fi/whatsmeow)" >> "$GITHUB_OUTPUT"
 
+  pull-request:
+    needs: test
+    if: needs.test.outputs.version != ''
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Install toolchain
+        run: pacman -Syu --noconfirm --needed go git github-cli
+
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Open the pull request
-        if: steps.bump.outputs.version != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.bump.outputs.version }}
+          REF: ${{ needs.test.outputs.ref }}
+          VERSION: ${{ needs.test.outputs.version }}
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           branch="bump-whatsmeow-$VERSION"
-          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
-            echo "a pull request for $VERSION exists already"
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            echo "a pull request for $VERSION is open already"
             exit 0
           fi
-          git switch -c "$branch"
+          go get "go.mau.fi/whatsmeow@$REF"
+          go mod tidy
+          if [ -n "$(git status --porcelain -- . ':!go.mod' ':!go.sum')" ]; then
+            echo "only go.mod and go.sum may change:"
+            git status --porcelain
+            exit 1
+          fi
+          git switch -C "$branch"
+          git add go.mod go.sum
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -qam "build(deps): bump whatsmeow to $VERSION"
-          git push origin "$branch"
+            commit -qm "build(deps): bump whatsmeow to $VERSION"
+          git push --force origin "$branch"
           gh pr create --base main --head "$branch" --title "build(deps): bump whatsmeow to $VERSION" \
             --body "The newest whatsmeow commit at least two weeks old, or the ref a manual run named. The tests passed in the workflow; run \`make ci\` locally before merging, since pull requests opened with the workflow token do not start CI."

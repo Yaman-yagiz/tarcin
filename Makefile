@@ -40,7 +40,12 @@ GO_LDFLAGS := -linkmode=external \
 	-X $(BUILDINFO).Version=$(VERSION) \
 	-X $(BUILDINFO).Commit=$(COMMIT) \
 	-X $(BUILDINFO).Date=$(DATE)
-BUILD_FLAGS ?= -trimpath
+# `make` builds what `make install` installs, so the binary gets the
+# hardening of the Arch packages: PIE, and full RELRO through the linker
+# flags, unless the environment sets its own.
+BUILD_FLAGS ?= -trimpath -buildmode=pie
+CGO_LDFLAGS ?= -Wl,-z,relro,-z,now
+export CGO_LDFLAGS
 
 # Developer tools are pinned in a separate module so they never enter the
 # main module's dependency graph or the release build.
