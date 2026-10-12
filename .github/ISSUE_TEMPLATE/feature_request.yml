@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest an improvement or a new feature.
+labels: [enhancement, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search the existing issues first.
+        tarcin will not add bulk messaging, scheduling, scraping, bots or other automation
+        (see the [security policy](https://github.com/Yaman-yagiz/tarcin/blob/main/docs/architecture/security.md#7-account-safety-user-facing)).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what gets in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should it work? Mention keybindings or config options if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: This is not an automation or bulk-messaging feature.
+          required: true

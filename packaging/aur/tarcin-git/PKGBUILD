@@ -1,0 +1,74 @@
+# Maintainer: Yaman-yagiz <ADDRESS at DOMAIN dot TLD>
+
+_pkgname=tarcin
+pkgname=tarcin-git
+pkgver=0.0.0.r0.g0000000
+pkgrel=1
+pkgdesc='Fast, secure terminal client for WhatsApp (unofficial)'
+arch=('x86_64' 'aarch64')
+url='https://github.com/Yaman-yagiz/tarcin'
+license=('GPL-3.0-or-later')
+depends=('glibc' 'sqlite')
+makedepends=('git' 'go' 'scdoc')
+provides=("$_pkgname=$pkgver")
+conflicts=("$_pkgname")
+optdepends=('xdg-utils: open media with the default application'
+            'notification-daemon: desktop notifications')
+source=("$_pkgname::git+$url.git")
+b2sums=('SKIP')
+
+pkgver() {
+  cd "$_pkgname"
+  if git describe --tags >/dev/null 2>&1; then
+    git describe --long --tags --abbrev=7 | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
+  else
+    printf '0.0.0.r%s.g%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+  fi
+}
+
+prepare() {
+  cd "$_pkgname"
+  export GOPATH="$srcdir/gopath"
+  go mod download -modcacherw
+}
+
+build() {
+  cd "$_pkgname"
+  export CGO_CPPFLAGS="$CPPFLAGS"
+  export CGO_CFLAGS="$CFLAGS"
+  export CGO_CXXFLAGS="$CXXFLAGS"
+  export CGO_LDFLAGS="$LDFLAGS"
+  export GOPATH="$srcdir/gopath"
+  export GOFLAGS='-buildmode=pie -trimpath -mod=readonly -modcacherw'
+  local _bi=github.com/Yaman-yagiz/tarcin/internal/buildinfo
+  local _date
+  _date=$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)
+  go build -tags libsqlite3 -o build/tarcin \
+    -ldflags "-linkmode=external -X $_bi.Version=$pkgver -X $_bi.Commit=$(git rev-parse --short=12 HEAD) -X $_bi.Date=$_date" ./cmd/tarcin
+  make man
+  ./build/tarcin config print-defaults > build/config.example.toml
+}
+
+check() {
+  cd "$_pkgname"
+  export CGO_CPPFLAGS="$CPPFLAGS"
+  export CGO_CFLAGS="$CFLAGS"
+  export CGO_CXXFLAGS="$CXXFLAGS"
+  export CGO_LDFLAGS="$LDFLAGS"
+  export GOPATH="$srcdir/gopath"
+  export GOFLAGS='-buildmode=pie -trimpath -mod=readonly -modcacherw'
+  go test -tags libsqlite3 ./...
+}
+
+package() {
+  cd "$_pkgname"
+  install -Dm755 build/tarcin -t "$pkgdir/usr/bin/"
+  install -Dm644 build/man/tarcin.1 -t "$pkgdir/usr/share/man/man1/"
+  install -Dm644 build/man/tarcin.5 -t "$pkgdir/usr/share/man/man5/"
+  install -Dm644 packaging/tarcin.desktop -t "$pkgdir/usr/share/applications/"
+  install -Dm644 packaging/completions/tarcin.bash "$pkgdir/usr/share/bash-completion/completions/tarcin"
+  install -Dm644 packaging/completions/_tarcin -t "$pkgdir/usr/share/zsh/site-functions/"
+  install -Dm644 packaging/completions/tarcin.fish -t "$pkgdir/usr/share/fish/vendor_completions.d/"
+  install -Dm644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname/"
+  install -Dm644 README.md build/config.example.toml -t "$pkgdir/usr/share/doc/$pkgname/"
+}

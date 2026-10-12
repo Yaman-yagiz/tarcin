@@ -1,0 +1,20 @@
+pkgbase = tarcin
+	pkgdesc = Fast, secure terminal client for WhatsApp (unofficial)
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/Yaman-yagiz/tarcin
+	arch = x86_64
+	arch = aarch64
+	license = GPL-3.0-or-later
+	makedepends = go
+	makedepends = scdoc
+	depends = glibc
+	depends = sqlite
+	optdepends = xdg-utils: open media with the default application
+	optdepends = notification-daemon: desktop notifications
+	source = https://github.com/Yaman-yagiz/tarcin/releases/download/v0.1.0/tarcin-0.1.0.tar.gz
+	source = https://github.com/Yaman-yagiz/tarcin/releases/download/v0.1.0/tarcin-0.1.0.tar.gz.sig
+	b2sums = SKIP
+	b2sums = SKIP
+
+pkgname = tarcin

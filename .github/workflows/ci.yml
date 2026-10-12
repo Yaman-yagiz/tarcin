@@ -1,0 +1,113 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# CI runs inside an Arch Linux container so that tests use the same Go
+# toolchain, C compiler and system libraries as the AUR package.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOCACHE: /github/home/.cache/go-build
+  GOMODCACHE: /github/home/go/pkg/mod
+  GOTOOLCHAIN: local
+  GOFLAGS: -mod=readonly
+
+jobs:
+  checks:
+    name: Lint, vulnerabilities, licenses
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    timeout-minutes: 20
+    steps:
+      - name: Install toolchain
+        run: pacman -Syu --noconfirm --needed go git shellcheck sqlite scdoc desktop-file-utils zsh fish
+
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Cache Go modules and build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /github/home/.cache/go-build
+            /github/home/go/pkg/mod
+          key: go-checks-${{ hashFiles('go.sum', 'tools/go.sum') }}
+          restore-keys: go-checks-
+
+      - name: Go version
+        run: go version
+
+      - name: Tidy
+        run: make check-tidy
+
+      - name: Lint
+        run: make lint
+
+      - name: Lint workflows and shell scripts
+        run: make lint-actions lint-shell
+
+      - name: Vulnerabilities
+        run: make vuln
+
+      - name: Licenses
+        run: make licenses
+
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    timeout-minutes: 20
+    steps:
+      - name: Install toolchain
+        run: pacman -Syu --noconfirm --needed go git sqlite
+
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Cache Go modules and build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /github/home/.cache/go-build
+            /github/home/go/pkg/mod
+          key: go-test-${{ hashFiles('go.sum') }}
+          restore-keys: go-test-
+
+      - name: Test (race detector, bundled SQLite)
+        run: make test
+
+      - name: Test (race detector, system SQLite)
+        run: make test-system-sqlite
+
+      - name: Property test (event order independence)
+        run: make property
+
+      - name: Build
+        run: make build && ./build/tarcin --version
+
+      - name: Build with Arch packaging flags and verify hardening
+        run: make hardening
+
+      - name: Fuzz (short)
+        run: make fuzz FUZZTIME=20s

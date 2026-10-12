@@ -1,0 +1,53 @@
+# Build output
+/tarcin
+/bin/
+/build/
+/dist/
+*.test
+*.exe
+
+# Go tooling output
+*.out
+*.prof
+*.pprof
+/coverage/
+coverage.*
+
+# Local databases, sessions and media: these may contain private messages
+# and device keys. They must never be committed.
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+/data/
+/media/
+
+# Secrets and local configuration
+.env
+.env.*
+*.key
+*.pem
+config.local.toml
+
+# Benchmark and profiling artifacts (keep committed reports under docs/)
+/bench/results/
+/testdata/generated/
+
+# Arch packaging build artifacts
+/packaging/aur/*/src/
+/packaging/aur/*/pkg/
+/packaging/aur/*/*.tar.*
+/packaging/aur/*/*.log
+*.pkg.tar.zst
+*.pkg.tar.zst.sig
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store

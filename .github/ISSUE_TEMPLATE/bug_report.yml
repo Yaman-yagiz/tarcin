@@ -1,0 +1,67 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Security problems must not be reported here**;
+        follow [SECURITY.md](https://github.com/Yaman-yagiz/tarcin/blob/main/SECURITY.md) instead.
+        Never paste message contents, phone numbers, QR/pairing codes or files from `~/.local/share/tarcin`.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a group with ~2,000 members
+        2. Press `G`
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: tarcin version
+      description: Output of `tarcin --version`.
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal emulator and $TERM
+      placeholder: "foot 1.24, TERM=foot"
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Distribution and kernel
+      placeholder: "Arch Linux, 6.18.55-1-lts"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: From `~/.local/state/tarcin/tarcin.log`. Logs are redacted, but check them before posting.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: I removed personal data (messages, names, numbers) from this report.
+          required: true

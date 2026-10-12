@@ -1,0 +1,48 @@
+#compdef tarcin
+# SPDX-License-Identifier: GPL-3.0-or-later
+# zsh completion for tarcin
+
+_tarcin() {
+  local -a commands
+  commands=(
+    'logout:unlink this device from your account and delete its keys'
+    'backup:write your messages and settings to a file'
+    'config:validate, locate or print the configuration'
+  )
+  local state
+  _arguments -C \
+    '--profile=[the profile: one account with its own data]:profile name' \
+    '--config=[the config file]:config file:_files' \
+    '--demo[run with simulated chats]' \
+    '--demo-rate=[live messages per second in the demo]:messages per second' \
+    '--demo-link[start the demo as a device that is not linked yet]' \
+    '--dump-keys[show the names of the keys you press]' \
+    '--pprof=[for developers: serve Go profiles on this loopback address]:address' \
+    '--trace=[for developers: record an execution trace into this new file]:trace file:_files' \
+    '--version[print version information and exit]' \
+    '1: :->command' \
+    '*:: :->args' && return
+
+  case $state in
+    command)
+      _describe -t commands 'tarcin command' commands
+      ;;
+    args)
+      case $words[1] in
+        logout)
+          _arguments '--profile=[the profile to log out of]:profile name'
+          ;;
+        backup)
+          _arguments '--profile=[the profile to back up]:profile name' \
+            '--with-keys[add the device keys]' '1:backup file:_files'
+          ;;
+        config)
+          _arguments '--config=[the config file]:config file:_files' \
+            '1:config command:(check path print-defaults)'
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_tarcin "$@"

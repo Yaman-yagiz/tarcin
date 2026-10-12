@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Opens a pull request that bumps whatsmeow, which follows WhatsApp's
+# protocol changes. By default it takes the newest commit on
+# whatsmeow's main that is at least two weeks old (security.md §6); a
+# manual run can name any ref, for a ClientOutdated emergency.
+name: Bump whatsmeow
+
+on:
+  schedule:
+    - cron: '17 6 * * 1' # Mondays, 06:17 UTC
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'whatsmeow commit or branch (empty: the newest commit at least 14 days old)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Install toolchain
+        run: pacman -Syu --noconfirm --needed go git github-cli sqlite
+
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Choose the commit
+        id: choose
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.ref }}
+        run: |
+          if [ -n "$REF" ]; then
+            ref=$REF
+          else
+            until=$(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ)
+            ref=$(gh api "repos/tulir/whatsmeow/commits?sha=main&until=$until&per_page=1" --jq '.[0].sha')
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Bump and test
+        id: bump
+        env:
+          REF: ${{ steps.choose.outputs.ref }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          go get "go.mau.fi/whatsmeow@$REF"
+          go mod tidy
+          if git diff --quiet; then
+            echo "whatsmeow is current"
+            exit 0
+          fi
+          go test -tags sqlite_fts5 ./...
+          echo "version=$(go list -m -f '{{.Version}}' go.mau.fi/whatsmeow)" >> "$GITHUB_OUTPUT"
+
+      - name: Open the pull request
+        if: steps.bump.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          branch="bump-whatsmeow-$VERSION"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "a pull request for $VERSION exists already"
+            exit 0
+          fi
+          git switch -c "$branch"
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -qam "build(deps): bump whatsmeow to $VERSION"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title "build(deps): bump whatsmeow to $VERSION" \
+            --body "The newest whatsmeow commit at least two weeks old, or the ref a manual run named. The tests passed in the workflow; run \`make ci\` locally before merging, since pull requests opened with the workflow token do not start CI."

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=tarcin
+GenericName=WhatsApp Client
+Comment=Terminal client for WhatsApp (unofficial)
+Exec=tarcin
+Terminal=true
+Categories=Network;InstantMessaging;Chat;ConsoleOnly;
+Keywords=WhatsApp;chat;messages;terminal;
+StartupNotify=false

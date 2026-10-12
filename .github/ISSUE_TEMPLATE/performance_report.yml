@@ -1,0 +1,49 @@
+name: Performance report
+description: The UI stalls, scrolling lags, or CPU or memory use is unexpectedly high.
+labels: [performance, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Responsiveness is tarcin's core promise, so performance reports are very welcome.
+        The budgets are in [performance.md](https://github.com/Yaman-yagiz/tarcin/blob/main/docs/architecture/performance.md).
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Symptom
+      description: What stalls or is slow, and for how long?
+      placeholder: "Typing freezes for ~2 s whenever a message arrives in a busy group."
+    validations:
+      required: true
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Scenario
+      description: Approximate sizes help us reproduce it with synthetic data.
+      placeholder: |
+        - Chat: group, ~3,000 members, ~40,000 local messages
+        - Activity: ~50 messages/minute
+        - What I was doing: scrolling up with `Ctrl-u`
+    validations:
+      required: true
+  - type: textarea
+    id: measurements
+    attributes:
+      label: Measurements
+      description: |
+        If you can, run with `--pprof=127.0.0.1:6060` or `--trace=trace.out` and attach a profile or trace,
+        plus CPU and RSS figures (e.g. from `top`). Profiles contain no message content.
+  - type: input
+    id: version
+    attributes:
+      label: tarcin version
+      description: Output of `tarcin --version`.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Terminal, size and hardware
+      placeholder: "kitty 0.44, 200x50, Ryzen 7 5800U, NVMe"
+    validations:
+      required: true

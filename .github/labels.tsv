@@ -1,0 +1,16 @@
+# name	color	description
+bug	d73a4a	Something does not work as documented
+enhancement	a2eeef	A new feature or an improvement
+performance	fbca04	Latency, CPU, memory or ingest throughput
+security	b60205	A security problem (report vulnerabilities privately: SECURITY.md)
+triage	ededed	Needs a first look by the maintainer
+good first issue	7057ff	Small and well described: a good start for a new contributor
+help wanted	008672	The maintainer would welcome a pull request
+documentation	0075ca	The user guide, man pages or architecture docs
+packaging	5319e7	AUR packages, releases, man pages and completions
+protocol	1d76db	The WhatsApp connection and whatsmeow
+ui	c5def5	The terminal interface
+store	bfdadc	The message database
+question	d876e3	A question rather than a report
+duplicate	cfd3d7	Already reported
+wontfix	ffffff	Out of scope, such as automation features

@@ -1,0 +1,24 @@
+tarcin keys — esc or q closes this screen                                       
+                                                                                
+Everywhere                                                                      
+  :                      command line                                           
+  tab                    next pane                                              
+  shift+tab              previous pane                                          
+  ?                      show this help                                         
+  ] u                    next unread chat                                       
+  [ u                    previous unread chat                                   
+  ctrl+q                 quit                                                   
+  ctrl+k, /              search chats                                           
+                                                                                
+Chat list and messages                                                          
+  G, end                 bottom (newest)                                        
+  j, down                down                                                   
+  ctrl+d                 half a page down                                       
+  ctrl+u                 half a page up                                         
+  ctrl+f, pgdown         page down                                              
+  ctrl+b, pgup           page up                                                
+  g g, home              top                                                    
+  k, up                  up                                                     
+                                                                                
+Chat list                                                                       
+ HELP  online                                                            ? help 
