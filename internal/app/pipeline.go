@@ -646,8 +646,13 @@ func (p *pipeline) readOpenChat(ctx context.Context, c *store.Changes) {
 	if open == 0 || p.away.Load() {
 		return
 	}
-	at := p.clock.Now()
+	// The read covers the messages this commit added, not the moment it
+	// runs: a message that arrives after the user left stays unread.
+	var at time.Time
 	_, reload := c.Reload[open]
+	if reload {
+		at = p.clock.Now()
+	}
 	incoming := reload
 	for i := range c.Added[open] {
 		if m := &c.Added[open][i]; !m.FromMe {

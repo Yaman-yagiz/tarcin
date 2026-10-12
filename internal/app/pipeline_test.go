@@ -453,6 +453,9 @@ func TestOpenChatStaysUnreadWhileAway(t *testing.T) {
 	}
 	incoming := func(waid string) {
 		t.Helper()
+		// A message in the same millisecond as a read counts as read: the
+		// next one comes later, as it would from the server.
+		time.Sleep(2 * time.Millisecond)
 		if err := p.Deliver(t.Context(), []domain.Event{domain.MessageReceived{Source: domain.SourceLive, Message: domain.IncomingMessage{
 			ChatJID: "101@lid", SenderJID: "101@lid", WAID: domain.WAMessageID(waid), Timestamp: time.Now(), Kind: domain.KindText, Body: "x",
 		}}}); err != nil {
