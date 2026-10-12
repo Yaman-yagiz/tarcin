@@ -3,9 +3,14 @@
 package wa
 
 import (
+	"context"
+	"fmt"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
+	"go.mau.fi/whatsmeow/appstate"
 	"go.mau.fi/whatsmeow/proto/waSyncAction"
 	"go.mau.fi/whatsmeow/types/events"
 	"google.golang.org/protobuf/proto"
@@ -68,5 +73,47 @@ func TestNormalizeAppState(t *testing.T) {
 	a := testAdapter(t)
 	if !a.cli.EmitAppStateEventsOnFullSync {
 		t.Fatal("a full sync must arrive as events")
+	}
+}
+
+// TestAppStateRecovery checks that a collection whose patches no longer
+// verify is synced again in full, once per cooldown, and that a failed
+// full sync is not retried.
+func TestAppStateRecovery(t *testing.T) {
+	a, sink := testAdapter(t), &recordingSink{}
+	var mu sync.Mutex
+	var calls []string
+	a.fetchAppState = func(_ context.Context, name appstate.WAPatchName, fullSync, onlyIfNotSynced bool) error {
+		mu.Lock()
+		defer mu.Unlock()
+		calls = append(calls, fmt.Sprintf("%s full=%t only=%t", name, fullSync, onlyIfNotSynced))
+		return nil
+	}
+	mismatch := fmt.Errorf("failed to verify patch v80: %w", appstate.ErrMismatchingLTHash)
+	failure := func(name appstate.WAPatchName, full bool) {
+		t.Helper()
+		if !a.handle(t.Context(), sink, &events.AppStateSyncError{Name: name, FullSync: full, Error: mismatch}) {
+			t.Fatal("a sync error must be acknowledged")
+		}
+		a.resyncs.Wait()
+	}
+	failure(appstate.WAPatchRegularLow, false)
+	failure(appstate.WAPatchRegularLow, false) // within the cooldown
+	failure(appstate.WAPatchRegular, true)     // a full sync failed: no loop
+	failure(appstate.WAPatchRegular, false)
+	want := []string{"regular_low full=true only=false", "regular full=true only=false"}
+	if !slices.Equal(calls, want) {
+		t.Fatalf("full syncs = %q, want %q", calls, want)
+	}
+	// After the cooldown, a collection may be synced in full again.
+	a.resyncMu.Lock()
+	a.resyncedAt[appstate.WAPatchRegularLow] = time.Now().Add(-appStateResyncCooldown)
+	a.resyncMu.Unlock()
+	failure(appstate.WAPatchRegularLow, false)
+	if len(calls) != 3 {
+		t.Fatalf("full syncs = %q", calls)
+	}
+	if len(sink.events) != 0 {
+		t.Fatalf("a sync error delivers nothing itself: %v", sink.events)
 	}
 }

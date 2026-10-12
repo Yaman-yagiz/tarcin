@@ -110,6 +110,14 @@ called synchronously.
   as one event per item, like a later change. Deleting or clearing a chat
   on another device is handled like `:delete-local`.
 
+  When a collection's patches no longer verify (`AppStateSyncError`, for
+  example a mismatching LTHash after a missed patch), whatsmeow only
+  reports it and the collection stops syncing. The adapter then drops
+  the local copy and syncs the collection in full, off the event
+  handler; the store applies the repeated items idempotently. A failed
+  full sync is logged and not retried, and a collection is synced in
+  full at most once every ten minutes.
+
   A message sent to a broadcast list belongs to the direct chat with its
   sender.
 - **Identity resolution** (`internal/wa/identity.go`) adds the second

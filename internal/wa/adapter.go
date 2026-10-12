@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/appstate"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -48,6 +49,13 @@ type Adapter struct {
 	// the session (logged out, replaced, banned, outdated): tarcin then
 	// never reconnects on its own.
 	stopped atomic.Uint32
+	// resyncs are the full app state syncs that recover a collection
+	// (see appstate.go); resyncMu guards resyncedAt. fetchAppState is
+	// the client's FetchAppState, replaced in tests.
+	resyncs       sync.WaitGroup
+	resyncMu      sync.Mutex
+	resyncedAt    map[appstate.WAPatchName]time.Time
+	fetchAppState func(ctx context.Context, name appstate.WAPatchName, fullSync, onlyIfNotSynced bool) error
 }
 
 var _ backend.Backend = (*Adapter)(nil)
@@ -86,7 +94,8 @@ func New(sess *Session, opts Options) *Adapter {
 		capReconnectBackoff(cli)
 		return true
 	}
-	return &Adapter{sess: sess, cli: cli, opts: opts, history: newHistoryQueue()}
+	return &Adapter{sess: sess, cli: cli, opts: opts, history: newHistoryQueue(),
+		resyncedAt: map[appstate.WAPatchName]time.Time{}, fetchAppState: cli.FetchAppState}
 }
 
 // capReconnectBackoff keeps the next reconnect delay, two seconds per
@@ -102,6 +111,9 @@ func capReconnectBackoff(cli *whatsmeow.Client) {
 // is not linked yet is linked first (see link.go); if that does not
 // complete, Run returns an error wrapping backend.ErrLinkFailed.
 func (a *Adapter) Run(ctx context.Context, sink backend.Sink) error {
+	// Work that event handlers start in the background ends with Run.
+	ctx, stop := context.WithCancel(ctx)
+	defer func() { stop(); a.resyncs.Wait() }()
 	id := a.cli.AddEventHandlerWithSuccessStatus(func(evt any) bool { return a.handle(ctx, sink, evt) })
 	// Never remove the handler from inside a handler: whatsmeow would
 	// deadlock.
@@ -218,6 +230,9 @@ func (a *Adapter) handle(ctx context.Context, sink backend.Sink, evt any) (ok bo
 		return true
 	case *events.GroupInfo:
 		return a.deliverAll(ctx, sink, a.normalizeGroupInfo(ctx, e))
+	case *events.AppStateSyncError:
+		a.recoverAppState(ctx, e)
+		return true
 	default:
 		return true // not handled yet
 	}

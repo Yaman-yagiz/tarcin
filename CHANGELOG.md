@@ -96,6 +96,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The open chat no longer marks new messages read, or sends read
   receipts, while the terminal does not have focus; it is read when you
   come back.
+- Pins, mutes, archives and other settings shared with the phone no
+  longer stop syncing after an app state patch fails to verify: the
+  affected collection is synced again in full.
 
 ### Security
 
