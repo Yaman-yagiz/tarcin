@@ -26,8 +26,13 @@ func TestNormalizeReceipts(t *testing.T) {
 			t.Errorf("%q: %+v", kind, ev)
 		}
 	}
-	if read := one(t, normalizeReceipt(r(types.ReceiptTypeReadSelf, true))).(domain.ChatRead); !read.ReadAt.Equal(ts) {
-		t.Fatalf("a read on another own device reads the chat: %+v", read)
+	// A read on the phone: "read" from this account with read receipts
+	// on, "read-self" with them off; both read the chat here.
+	for _, kind := range []types.ReceiptType{types.ReceiptTypeRead, types.ReceiptTypePlayed, types.ReceiptTypeReadSelf, types.ReceiptTypePlayedSelf} {
+		read, ok := one(t, normalizeReceipt(r(kind, true))).(domain.ChatRead)
+		if !ok || !read.ReadAt.Equal(ts) || read.ChatJID != "120363001@g.us" {
+			t.Fatalf("%q on another own device must read the chat: %+v", kind, read)
+		}
 	}
 	for _, rc := range []*events.Receipt{r(types.ReceiptTypeRetry, false), r(types.ReceiptTypeSender, true),
 		r(types.ReceiptTypeDelivered, true), r(types.ReceiptTypeServerError, false),

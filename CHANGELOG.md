@@ -104,6 +104,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Chats read on the phone are read here too. The phone reports such a
+  read as a "read" receipt from this account, which tarcin dropped as
+  if one of its devices had read its own copy.
+- A group message shows read (blue ticks) only once every member has
+  read it, as on the phone, not at the first member's read; until the
+  group's members are known, at most delivered. Messages from before
+  this change keep their ticks.
 - A click on a long web address opens all of it: addresses are OSC 8
   hyperlinks, part by part where they break over lines, instead of
   left to the terminal, which saw only the part before the break.

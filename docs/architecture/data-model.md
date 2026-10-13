@@ -218,6 +218,18 @@ CREATE TABLE pending_ops (
 ) STRICT;
 CREATE INDEX pending_ops_target ON pending_ops (chat_id, target_wa_id);
 
+-- Receipts of this account's group messages, per member (migration
+-- 0006). A group message is delivered, read or played once every member
+-- other than this account is, as the phone shows it; until the members
+-- are known, at most delivered. A change of members counts the newest
+-- 500 own messages that are not read yet again.
+CREATE TABLE receipts (
+  message_id   INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  identity_id  INTEGER NOT NULL REFERENCES identities(id) ON DELETE CASCADE,
+  status       INTEGER NOT NULL,
+  PRIMARY KEY (message_id, identity_id)
+) STRICT, WITHOUT ROWID;
+
 CREATE TABLE group_meta (
   chat_id            INTEGER PRIMARY KEY REFERENCES chats(id) ON DELETE CASCADE,
   subject            TEXT,

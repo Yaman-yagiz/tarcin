@@ -66,8 +66,8 @@ func TestSchemaTablesAreStrict(t *testing.T) {
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if tables != 10 {
-		t.Errorf("%d tables, want 10", tables)
+	if tables != 11 {
+		t.Errorf("%d tables, want 11", tables)
 	}
 	var ok string
 	if err := db.QueryRowContext(t.Context(), "PRAGMA integrity_check").Scan(&ok); err != nil || ok != "ok" {

@@ -428,13 +428,65 @@ func TestApplyReceiptsInAnyOrder(t *testing.T) {
 	sent.Message.FromMe = true
 	delivered := domain.ReceiptReceived{ChatJID: group, WAIDs: []domain.WAMessageID{"W1"}, From: aliLID, Status: domain.StatusDelivered, Timestamp: at(11)}
 	read := domain.ReceiptReceived{ChatJID: group, WAIDs: []domain.WAMessageID{"W1", "W404"}, From: aliLID, Status: domain.StatusRead, Timestamp: at(12)}
-	state := orderIndependent(t, sent, delivered, read)
+	members := domain.GroupMembersChanged{ChatJID: group, Full: true, Members: []domain.GroupMember{{JID: meLID}, {JID: aliLID}}}
+	state := orderIndependent(t, sent, members, delivered, read)
 	if !strings.Contains(state, fmt.Sprintf(" text hi %d ", domain.StatusRead)) {
 		t.Fatalf("status must end as read:\n%s", state)
 	}
 	// The receipt for the unknown W404 keeps waiting.
 	if !strings.Contains(state, "\n1\n--") {
 		t.Fatalf("want one pending receipt:\n%s", state)
+	}
+}
+
+// TestApplyGroupMessageIsReadWhenEveryMemberIs: one member's read does
+// not make a group message read, as on the phone, and a receipt for
+// someone else's message changes nothing.
+func TestApplyGroupMessageIsReadWhenEveryMemberIs(t *testing.T) {
+	f := newApplyFixture(t)
+	sent := incoming(group, meLID, "W1", "hi", 10)
+	sent.Message.FromMe = true
+	receipt := func(from domain.JID, status domain.MessageStatus) domain.ReceiptReceived {
+		return domain.ReceiptReceived{ChatJID: group, WAIDs: []domain.WAMessageID{"W1"}, From: from, Status: status, Timestamp: at(11)}
+	}
+	statusOf := func() domain.MessageStatus {
+		t.Helper()
+		c, _, _ := f.r.ChatID(t.Context(), group)
+		return f.messages(c)[0].Status
+	}
+	f.apply(sent, receipt(aliLID, domain.StatusRead))
+	if got := statusOf(); got != domain.StatusDelivered {
+		t.Fatalf("members unknown: status %v, want delivered at most", got)
+	}
+	f.apply(domain.GroupMembersChanged{ChatJID: group, Full: true, Members: []domain.GroupMember{{JID: meLID}, {JID: aliLID}, {JID: ayLID}}})
+	f.apply(receipt(aliLID, domain.StatusRead), receipt(ayLID, domain.StatusDelivered))
+	if got := statusOf(); got != domain.StatusDelivered {
+		t.Fatalf("Ayşe has not read it: status %v, want delivered", got)
+	}
+	f.apply(receipt(ayLID, domain.StatusRead))
+	if got := statusOf(); got != domain.StatusRead {
+		t.Fatalf("everyone read it: status %v, want read", got)
+	}
+	// Ayşe's number and LID merge: her receipt stays hers.
+	f.apply(domain.IdentityLinked{PN: ayPN, LID: ayLID})
+	if n := f.count("SELECT count(*) FROM receipts"); n != 2 {
+		t.Fatalf("%d receipts after the merge, want 2", n)
+	}
+
+	// This device's own outcome for a group message is no member's
+	// receipt: a failed send stays failed.
+	failed := incoming(group, meLID, "W3", "lost", 14)
+	failed.Message.FromMe, failed.Source = true, domain.SourceSelf // pending, as this device stores it
+	f.apply(failed, domain.ReceiptReceived{ChatJID: group, WAIDs: []domain.WAMessageID{"W3"}, From: meLID, Status: domain.StatusFailed, Timestamp: at(15)})
+	if m := f.messages(f.chats()[0].ID); m[len(m)-1].Status != domain.StatusFailed {
+		t.Fatalf("a failed group send shows %v", m[len(m)-1].Status)
+	}
+
+	other := incoming(group, aliLID, "W2", "theirs", 12)
+	f.apply(other, domain.ReceiptReceived{ChatJID: group, WAIDs: []domain.WAMessageID{"W2"}, From: ayLID, Status: domain.StatusRead, Timestamp: at(13)})
+	c, _, _ := f.r.ChatID(t.Context(), group)
+	if m := f.messages(c)[1]; m.Status != domain.StatusDelivered {
+		t.Fatalf("a receipt moved someone else's message to %v", m.Status)
 	}
 }
 

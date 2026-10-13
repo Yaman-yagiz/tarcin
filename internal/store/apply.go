@@ -999,7 +999,7 @@ func (t *applyTx) applyOps(chat domain.ChatID, waid domain.WAMessageID, id domai
 		}
 		switch s.kind {
 		case opReceipt:
-			_, err = t.receipt(id, op.Status)
+			_, err = t.receipt(id, op.Actor, op.Status)
 		case opEdit:
 			_, err = t.edit(id, op.Body, op.At)
 		case opRevoke:
@@ -1014,18 +1014,104 @@ func (t *applyTx) applyOps(chat domain.ChatID, waid domain.WAMessageID, id domai
 }
 
 // receipt advances a message's status.
-func (t *applyTx) receipt(id domain.MessageID, status domain.MessageStatus) (bool, error) {
-	var stored int64
-	if err := t.queryRow("SELECT status FROM messages WHERE id = ?", id).Scan(&stored); err != nil {
+// receipt applies a receipt from a recipient of an own message. In a
+// direct chat it moves the message's status on; in a group the message
+// is delivered, read or played once every member is, as the phone shows
+// it. A receipt for someone else's message changes nothing.
+func (t *applyTx) receipt(id domain.MessageID, from domain.JID, status domain.MessageStatus) (bool, error) {
+	var (
+		stored int64
+		fromMe bool
+		kind   string
+		chat   domain.ChatID
+	)
+	if err := t.queryRow(`SELECT m.status, m.from_me, c.kind, m.chat_id FROM messages m
+		JOIN chats c ON c.id = m.chat_id WHERE m.id = ?`, id).Scan(&stored, &fromMe, &kind, &chat); err != nil {
 		return false, err
 	}
-	cur := domain.MessageStatus(u8(stored))
+	if !fromMe {
+		return false, nil
+	}
+	// Sent and failed come from this device's sender: only what the
+	// recipients report is counted per member.
+	if kind == "group" && status >= domain.StatusDelivered && status <= domain.StatusPlayed {
+		var err error
+		if status, err = t.groupReceipt(id, chat, from, status); err != nil {
+			return false, err
+		}
+	}
+	return t.advance(id, domain.MessageStatus(u8(stored)), status)
+}
+
+// status moves a message's own status on: the server accepted it, or a
+// duplicate of it went further.
+func (t *applyTx) status(id domain.MessageID, status domain.MessageStatus) error {
+	var stored int64
+	if err := t.queryRow("SELECT status FROM messages WHERE id = ?", id).Scan(&stored); err != nil {
+		return err
+	}
+	_, err := t.advance(id, domain.MessageStatus(u8(stored)), status)
+	return err
+}
+
+// advance moves a message's status on from cur to status, never back.
+func (t *applyTx) advance(id domain.MessageID, cur, status domain.MessageStatus) (bool, error) {
 	next := cur.Advance(status)
 	if next == cur {
 		return false, nil
 	}
 	_, err := t.exec("UPDATE messages SET status = ?, revision = revision + 1 WHERE id = ?", next, id)
 	return err == nil, err
+}
+
+// groupReceipt records a member's receipt for an own group message and
+// returns the status every member has reached: delivered, read or
+// played once all of them are, else sent. While the members are not
+// known yet, a receipt counts as delivered at most: a message is never
+// shown read by everyone on one member's word.
+func (t *applyTx) groupReceipt(id domain.MessageID, chat domain.ChatID, from domain.JID, status domain.MessageStatus) (domain.MessageStatus, error) {
+	if from.IsUser() {
+		who, err := t.resolve(from)
+		if err != nil {
+			return 0, err
+		}
+		if _, err := t.exec(`INSERT INTO receipts (message_id, identity_id, status) VALUES (?1, ?2, ?3)
+			ON CONFLICT (message_id, identity_id) DO UPDATE SET status = max(status, excluded.status)`,
+			id, who, status); err != nil {
+			return 0, err
+		}
+	}
+	agg, known, err := t.groupStatus(id, chat)
+	if err != nil || known {
+		return agg, err
+	}
+	return min(status, domain.StatusDelivered), nil
+}
+
+// groupStatus returns the status every member of a group has reached for
+// an own message: delivered, read or played once all of them are, else
+// sent; known is false while the members are not.
+func (t *applyTx) groupStatus(id domain.MessageID, chat domain.ChatID) (status domain.MessageStatus, known bool, err error) {
+	var members, delivered, read, played int
+	if err := t.queryRow(`SELECT count(*), coalesce(sum(r.status >= ?3), 0), coalesce(sum(r.status >= ?4), 0),
+			coalesce(sum(r.status >= ?5), 0)
+		FROM group_members gm JOIN identities i ON i.id = gm.identity_id AND NOT i.is_me
+		LEFT JOIN receipts r ON r.message_id = ?1 AND r.identity_id = gm.identity_id
+		WHERE gm.chat_id = ?2`, id, chat, domain.StatusDelivered, domain.StatusRead, domain.StatusPlayed).
+		Scan(&members, &delivered, &read, &played); err != nil {
+		return 0, false, err
+	}
+	switch {
+	case members == 0:
+		return 0, false, nil
+	case played == members:
+		return domain.StatusPlayed, true, nil
+	case read == members:
+		return domain.StatusRead, true, nil
+	case delivered == members:
+		return domain.StatusDelivered, true, nil
+	}
+	return domain.StatusSent, true, nil
 }
 
 // edit replaces a message's body unless it is revoked or already has a
@@ -1111,8 +1197,8 @@ func (t *applyTx) receiptEvent(e *domain.ReceiptReceived) error {
 		if waid == "" {
 			continue
 		}
-		err := t.targetOp(e.ChatJID, waid, opReceipt, pendingOp{Status: e.Status}, ts,
-			func(id domain.MessageID) (bool, error) { return t.receipt(id, e.Status) })
+		err := t.targetOp(e.ChatJID, waid, opReceipt, pendingOp{Status: e.Status, Actor: e.From}, ts,
+			func(id domain.MessageID) (bool, error) { return t.receipt(id, e.From, e.Status) })
 		if err != nil {
 			return err
 		}
@@ -1146,7 +1232,7 @@ func (t *applyTx) messageSent(e *domain.MessageSent) error {
 	case err != nil:
 		return err
 	}
-	if _, err := t.receipt(id, domain.StatusSent); err != nil {
+	if err := t.status(id, domain.StatusSent); err != nil {
 		return err
 	}
 	at := e.At.UnixMilli()
@@ -1527,17 +1613,70 @@ func (t *applyTx) groupMembers(e *domain.GroupMembersChanged) error {
 		}
 	}
 	t.ch.TouchGroup(chat.id)
-	if !e.Full {
-		return nil
+	if e.Full {
+		if _, err := t.exec(`DELETE FROM group_members WHERE chat_id = ?
+			AND identity_id NOT IN (SELECT value FROM json_each(?))`, chat.id, idList(ids)); err != nil {
+			return err
+		}
+		if _, err := t.exec(`INSERT INTO group_meta (chat_id, participant_count, fetched_at) VALUES (?, ?, ?)
+			ON CONFLICT (chat_id) DO UPDATE SET participant_count = excluded.participant_count, fetched_at = excluded.fetched_at`,
+			chat.id, len(ids), t.now); err != nil {
+			return err
+		}
 	}
-	if _, err := t.exec(`DELETE FROM group_members WHERE chat_id = ?
-		AND identity_id NOT IN (SELECT value FROM json_each(?))`, chat.id, idList(ids)); err != nil {
+	return t.recountReceipts(chat.id)
+}
+
+// recountLimit bounds the own messages a member change recounts.
+const recountLimit = 500
+
+// recountReceipts counts the receipts of a group's newest own messages
+// that are not read yet against its members again, after they changed:
+// receipts may have come before the members were known, and a member
+// who left no longer holds a message back.
+func (t *applyTx) recountReceipts(chat domain.ChatID) error {
+	rows, err := t.tx.QueryContext(t.ctx, `SELECT m.id, m.status FROM messages m
+		WHERE m.chat_id = ? AND m.from_me AND m.status < ?
+			AND EXISTS (SELECT 1 FROM receipts r WHERE r.message_id = m.id)
+		ORDER BY m.id DESC LIMIT ?`, chat, domain.StatusRead, recountLimit)
+	if err != nil {
 		return err
 	}
-	_, err = t.exec(`INSERT INTO group_meta (chat_id, participant_count, fetched_at) VALUES (?, ?, ?)
-		ON CONFLICT (chat_id) DO UPDATE SET participant_count = excluded.participant_count, fetched_at = excluded.fetched_at`,
-		chat.id, len(ids), t.now)
-	return err
+	type own struct {
+		id     domain.MessageID
+		status int64
+	}
+	var msgs []own
+	for rows.Next() {
+		var o own
+		if err := rows.Scan(&o.id, &o.status); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		msgs = append(msgs, o)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, o := range msgs {
+		status, known, err := t.groupStatus(o.id, chat)
+		if err != nil {
+			return err
+		}
+		if !known {
+			continue
+		}
+		changed, err := t.advance(o.id, domain.MessageStatus(u8(o.status)), status)
+		if err != nil {
+			return err
+		}
+		if changed {
+			if err := t.notify(chat, o.id, false); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // groupMeta stores a group's description and settings. A group known

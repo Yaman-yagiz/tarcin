@@ -223,6 +223,12 @@ func (t *applyTx) merge(into, from domain.IdentityID, pn, lid domain.JID) error 
 		"DELETE FROM group_members WHERE identity_id = ?2 AND chat_id IN (SELECT chat_id FROM group_members WHERE identity_id = ?1)",
 		"UPDATE group_members SET identity_id = ?1 WHERE identity_id = ?2",
 		"UPDATE group_meta SET owner_id = ?1 WHERE owner_id = ?2",
+		// Of two receipts by the person for one message, keep the further.
+		`UPDATE receipts SET status = max(status, (SELECT r.status FROM receipts r
+			WHERE r.identity_id = ?2 AND r.message_id = receipts.message_id))
+			WHERE identity_id = ?1 AND message_id IN (SELECT message_id FROM receipts WHERE identity_id = ?2)`,
+		"DELETE FROM receipts WHERE identity_id = ?2 AND message_id IN (SELECT message_id FROM receipts WHERE identity_id = ?1)",
+		"UPDATE receipts SET identity_id = ?1 WHERE identity_id = ?2",
 		"UPDATE jid_aliases SET identity_id = ?1 WHERE identity_id = ?2",
 	} {
 		if _, err := t.exec(q, into, from); err != nil {
@@ -414,7 +420,7 @@ func (t *applyTx) mergeCopy(d *duplicate) error {
 			return err
 		}
 	}
-	if _, err := t.receipt(d.keep, domain.MessageStatus(u8(d.status))); err != nil {
+	if err := t.status(d.keep, domain.MessageStatus(u8(d.status))); err != nil {
 		return err
 	}
 	for _, q := range []string{

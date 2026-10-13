@@ -317,8 +317,12 @@ The bridge is the boundary between backend speed and UI speed.
   offline, the receipts are not sent; only the other side's ticks miss
   them.
 - **Receipts from others** move own messages to delivered, read or
-  played. A read or play on another of this account's devices reads the
-  chat here too.
+  played: in a direct chat at once, in a group once every member has
+  (the `receipts` table, [data model](data-model.md) §3). A receipt for
+  someone else's message changes nothing.
+- **Reads on this account's other devices** read the chat here too. The
+  phone reports them as a "read" or "played" receipt from this account,
+  or as "read-self" when the account has read receipts off.
 
 ### 3.5 Jobs: bounded background work
 

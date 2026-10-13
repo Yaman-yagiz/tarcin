@@ -12,6 +12,9 @@ import (
 // normalizeReceipt turns a receipt into a status change of own messages,
 // or, for a read on another of this account's devices, into a read of the
 // chat. Retry, server-error and similar receipts are whatsmeow's business.
+//
+// A read on the phone arrives as a "read" (or "played") receipt from this
+// account; "read-self" only when the account has read receipts off.
 func normalizeReceipt(e *events.Receipt) []domain.Event {
 	chat := fromJID(e.Chat)
 	if e.Chat == types.StatusBroadcastJID || len(e.MessageIDs) == 0 {
@@ -34,7 +37,10 @@ func normalizeReceipt(e *events.Receipt) []domain.Event {
 		return nil
 	}
 	if e.IsFromMe {
-		return nil // an own device received or read its own copy
+		if status == domain.StatusDelivered {
+			return nil // an own device received its copy
+		}
+		return []domain.Event{domain.ChatRead{ChatJID: chat, ReadAt: e.Timestamp}} // read there
 	}
 	ids := make([]domain.WAMessageID, len(e.MessageIDs))
 	for i, id := range e.MessageIDs {
