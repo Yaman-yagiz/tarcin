@@ -38,6 +38,7 @@ var actionHelp = map[keymap.Action]string{
 	keymap.OpenMedia:    "open media",
 	keymap.SaveMedia:    "save media",
 	keymap.JumpQuoted:   "jump to quoted message",
+	keymap.OpenLink:     "open a link (again: the next)",
 	keymap.ViewPager:    "read in $PAGER",
 	keymap.Retry:        "send a failed message again",
 	keymap.Send:         "send",

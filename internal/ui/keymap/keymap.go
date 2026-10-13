@@ -78,6 +78,7 @@ const (
 	OpenMedia  Action = "open-media"
 	SaveMedia  Action = "save-media"
 	JumpQuoted Action = "jump-quoted"
+	OpenLink   Action = "open-link"
 	ViewPager  Action = "view-pager"
 	Retry      Action = "retry"
 	Forward    Action = "forward"
@@ -124,6 +125,7 @@ var defaults = map[Context]map[Action][]string{
 		OpenMedia:  {"o"},
 		SaveMedia:  {"s"},
 		JumpQuoted: {"gq"},
+		OpenLink:   {"gx"},
 		ViewPager:  {"v"},
 		Retry:      {"ctrl+r"},
 		Forward:    {"f"},

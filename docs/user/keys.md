@@ -9,7 +9,7 @@
 | Everywhere | `ctrl+q` quit · `?` help · `:` command line · `/` or `ctrl+k` find a chat · `tab` / `shift+tab` next / previous pane · `]u` / `[u` next / previous unread chat |
 | Lists | `j` / `k` or arrows · `gg` / `G` or `home` / `end` · `ctrl+d` / `ctrl+u` half a page · `ctrl+f` / `ctrl+b` or `pgdown` / `pgup` a page |
 | Chat list | `enter` or `l` open |
-| Messages | `i` / `a` write · `R` reply · `r` react · `e` edit · `dd` delete for everyone · `f` forward · `y` copy · `v` read in `$PAGER` · `o` open media · `s` save media · `gq` jump to the quoted message · `ctrl+r` send again |
+| Messages | `i` / `a` write · `R` reply · `r` react · `e` edit · `dd` delete for everyone · `f` forward · `y` copy · `v` read in `$PAGER` · `o` open media · `s` save media · `gq` jump to the quoted message · `gx` open a link · `ctrl+r` send again |
 | Composer | `enter` send · `shift+enter`, `alt+enter` or `ctrl+j` new line · `ctrl+x ctrl+e` edit in `$EDITOR` · `esc` back · readline keys such as `ctrl+a`, `ctrl+e`, `ctrl+w`, `ctrl+u` |
 
 `shift+enter` needs a terminal with the kitty keyboard protocol; the

@@ -119,12 +119,19 @@ func (m *Model) statusLine(w int) string {
 // selectedMediaHint names the keys that open and save the selected
 // message's media, while the messages have focus.
 func (m *Model) selectedMediaHint() string {
-	if m.focus != FocusMessages || m.mediaHint == "" || m.openMediaFn == nil {
+	if m.focus != FocusMessages {
 		return ""
 	}
 	msg, ok := m.msgs.SelectedMessage()
-	if !ok || !msg.Kind.HasMedia() || msg.IsRevoked() || msg.Flags.Has(domain.FlagViewOnce) {
+	if !ok || msg.IsRevoked() {
 		return ""
 	}
-	return m.mediaHint
+	var hints []string
+	if m.mediaHint != "" && m.openMediaFn != nil && msg.Kind.HasMedia() && !msg.Flags.Has(domain.FlagViewOnce) {
+		hints = append(hints, m.mediaHint)
+	}
+	if m.linkHint != "" && m.openLinkFn != nil && m.hasLinks.has(&msg) {
+		hints = append(hints, m.linkHint)
+	}
+	return strings.Join(hints, " · ")
 }

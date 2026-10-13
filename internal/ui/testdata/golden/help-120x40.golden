@@ -30,11 +30,11 @@ Messages
   e                      edit your message                                                                              
   f                      forward                                                                                        
   g q                    jump to quoted message                                                                         
+  g x                    open a link (again: the next)                                                                  
   o                      open media                                                                                     
   r                      react                                                                                          
   R                      reply                                                                                          
   ctrl+r                 send a failed message again                                                                    
   s                      save media                                                                                     
   v                      read in $PAGER                                                                                 
-                                                                                                                        
  HELP  online                                                                                                    ? help 

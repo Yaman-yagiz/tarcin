@@ -90,6 +90,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runs.
 - Storage and load benchmarks for the performance budgets
   (`make storagebench`, `make loadtest`).
+- `gx` opens the selected message's links in your browser, one after
+  another.
 - `:new NAME` starts a chat with a contact of your address book, and
   `:new +NUMBER` with a phone number, which is checked with WhatsApp
   first; `tab` completes contact names. A chat that exists just opens.
@@ -102,6 +104,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A click on a long web address opens all of it: addresses are OSC 8
+  hyperlinks, part by part where they break over lines, instead of
+  left to the terminal, which saw only the part before the break.
+- `y` copies with `wl-copy` (Wayland), `xclip` or `xsel` (X11);
+  through the terminal (OSC 52) only without them, since GNOME Console
+  and GNOME Terminal ignore it. The passkey snippet is copied the same
+  way.
 - `sudo make install` no longer builds as root, which left root-owned
   files in `./build`: `make` builds everything it installs, as the user,
   and `make install` only copies.

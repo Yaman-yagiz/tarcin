@@ -332,6 +332,19 @@ func (h *mediaHandler) openMedia(msg domain.Message) tea.Cmd {
 	}
 }
 
+// openLink opens a web address with the default opener. The UI passes
+// only http and https addresses (msglist.Links), so the argument is no
+// file and no option.
+func (h *mediaHandler) openLink(url string) tea.Cmd {
+	return func() tea.Msg {
+		argv := append(slices.Clone(h.o.Open), url)
+		if err := h.o.start(argv); err != nil {
+			return ui.BatchMsg{Notice: "Could not open the link with " + argv[0] + ": " + err.Error()}
+		}
+		return ui.BatchMsg{Notice: "Opened the link with " + filepath.Base(argv[0])}
+	}
+}
+
 // saveMedia returns the ui.Options.SaveMedia function: it downloads the
 // media if needed and copies it to the save directory under a safe name,
 // never over an existing file.

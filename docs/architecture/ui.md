@@ -99,8 +99,11 @@ component (`internal/ui/msglist`) instead.
   copy in the window when it is loaded, else the preview the store reads
   with the reply, so a quote of an old message shows too. `gq` selects
   the quoted message, loading the window around it when it is outside.
-- `y` copies the selected message's text to the clipboard through the
-  terminal (OSC 52, which some terminals refuse), and `v` shows it in
+- `y` copies the selected message's text to the clipboard with
+  `wl-copy` (Wayland), `xclip` or `xsel` (X11), run without a shell
+  with the text on standard input; without them, through the terminal
+  (OSC 52), which works over SSH but which VTE terminals (GNOME Console,
+  GNOME Terminal) ignore. `v` shows it in
   `$PAGER`, or `less` without one. Both use the text as the list shows
   it, sanitized; the pager reads it from its standard input, so it never
   goes to a file.
@@ -221,7 +224,7 @@ which is the name to use in the config.
 |---|---|
 | Global | `Ctrl-q` quit · `?` help · `:` command line · `Ctrl-k` or `/` search chats · `Tab` / `Shift-Tab` switch pane · `]u` / `[u` next / previous unread |
 | Lists | `j` / `k`, arrow keys · `gg` / `G`, Home / End · `Ctrl-d` / `Ctrl-u` · `Ctrl-f` / `Ctrl-b`, PgDn / PgUp · `Enter` or `l` open |
-| Selected message | `i` / `a` compose · `R` reply · `r` react · `f` forward · `e` edit own · `dd` delete (with confirmation) · `y` copy (OSC 52) · `o` open media · `s` save media · `gq` jump to quoted · `v` view in `$PAGER` · `Ctrl-r` send a failed message again |
+| Selected message | `i` / `a` compose · `R` reply · `r` react · `f` forward · `e` edit own · `dd` delete (with confirmation) · `y` copy · `o` open media · `s` save media · `gq` jump to quoted · `gx` open a link · `v` view in `$PAGER` · `Ctrl-r` send a failed message again |
 | Compose | `Enter` send · `Shift-Enter` / `Alt-Enter` / `Ctrl-j` newline · `Ctrl-x Ctrl-e` edit in `$EDITOR` · `Esc` back to normal · readline keys (`Ctrl-a`, `Ctrl-e`, `Ctrl-w`, `Ctrl-u`) |
 
 We avoid Alt chords as primary bindings, because some keyboard layouts
@@ -281,8 +284,15 @@ display names, group subjects, file names and link previews.
   kept in bodies.
 - Very long messages are cut off with a "show more" action that opens
   the pager. The limit can be configured.
-- URLs are shown as text. Clickable OSC 8 hyperlinks are an opt-in
-  setting, and are only emitted for URLs that pass validation.
+- Web addresses in message bodies are OSC 8 hyperlinks, part by part
+  where the wrap breaks them, so a click opens the whole address; a
+  terminal that guesses links from the screen would see only the part
+  before the break. The target is always the address the text shows,
+  after sanitizing: http and https only, an ASCII host, no user name
+  (`https://bank.example@evil.example` is not linked), at most 2 KiB,
+  the rest of the path percent-escaped. `gx` opens the selected
+  message's links in turn with the media opener. Terminals without
+  OSC 8 ignore the sequences.
 
 The sanitiser has fuzz tests (`go test -fuzz`) asserting that its output
 never contains `ESC`, C1 bytes or BiDi controls.
@@ -364,7 +374,7 @@ a companion device:
 |---|---|---|
 | QR code (default) | Scans the code with the phone (Settings → Linked devices → Link a device) | Drawn with half blocks, black on white whatever the terminal's colours, because many scanners do not read an inverted code, with a two-module margin, which phone cameras read on a screen. It changes every 20 seconds. A terminal too small for the whole screen shows only the code and one line (57×31 for a real code); a smaller one says how large it must be and suggests a smaller font or the phone number. |
 | Pairing code (`p`) | Enters the phone number, then types the code tarcin shows on the phone | WhatsApp only accepts a common browser name for this, so the phone shows "Chrome (Linux)" while linking |
-| Passkey hand-off | Some accounts require a passkey. The user opens web.whatsapp.com in a browser, runs a three-line snippet in the console (ctrl+y copies it with OSC 52), and pastes the line it prints | A passkey assertion is bound to the web.whatsapp.com origin, so no terminal program can make it; the snippet hands the challenge to the user's own browser and authenticator. If the phone asks, the user then compares a code (y/n). |
+| Passkey hand-off | Some accounts require a passkey. The user opens web.whatsapp.com in a browser, runs a three-line snippet in the console (ctrl+y copies it), and pastes the line it prints | A passkey assertion is bound to the web.whatsapp.com origin, so no terminal program can make it; the snippet hands the challenge to the user's own browser and authenticator. If the phone asks, the user then compares a code (y/n). |
 
 Linking runs inside the backend's `Run`, with the event handler already
 registered: the phone starts the history sync as soon as the link is

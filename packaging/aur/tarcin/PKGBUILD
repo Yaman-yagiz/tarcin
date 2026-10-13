@@ -9,7 +9,9 @@ url='https://github.com/Yaman-yagiz/tarcin'
 license=('GPL-3.0-or-later')
 depends=('glibc' 'sqlite')
 makedepends=('go' 'scdoc')
-optdepends=('xdg-utils: open media with the default application')
+optdepends=('xdg-utils: open media and links with the default application'
+            'wl-clipboard: copy messages on Wayland'
+            'xclip: copy messages on X11')
 # Go builds with -trimpath leave the debug package without sources.
 options=('!debug')
 source=("$url/releases/download/v$pkgver/$pkgname-$pkgver.tar.gz"{,.sig})

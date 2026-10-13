@@ -12,7 +12,9 @@ depends=('glibc' 'sqlite')
 makedepends=('git' 'go' 'scdoc')
 provides=("$_pkgname=$pkgver")
 conflicts=("$_pkgname")
-optdepends=('xdg-utils: open media with the default application')
+optdepends=('xdg-utils: open media and links with the default application'
+            'wl-clipboard: copy messages on Wayland'
+            'xclip: copy messages on X11')
 # Go builds with -trimpath leave the debug package without sources.
 options=('!debug')
 source=("$_pkgname::git+$url.git")

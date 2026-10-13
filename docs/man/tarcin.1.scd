@@ -115,13 +115,15 @@ the top and the bottom, and *enter* opens a chat. On a selected message:
 |  *f*
 :[ forward
 |  *y*
-:[ copy the text (OSC 52)
+:[ copy the text (with *wl-copy*, *xclip* or *xsel*, else OSC 52)
 |  *v*
 :[ read the text in *$PAGER*
 |  *o*, *s*
 :[ open or save the media
 |  *gq*
 :[ jump to the quoted message
+|  *gx*
+:[ open a link of the message in the browser; again, the next
 |  *ctrl+r*
 :[ send a failed message again
 

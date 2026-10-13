@@ -79,8 +79,9 @@ back to the defaults. The details and the permission rules are in
   `category=im.received` and `desktop-entry=tarcin`. Markup is stripped
   unless the server reports `body-markup`. Without a session bus, tarcin
   falls back to the terminal bell.
-- **Clipboard:** OSC 52, which works over SSH. Optional `wl-copy` /
-  `xclip` can be configured as an external command.
+- **Clipboard:** `wl-copy` on Wayland, `xclip` or `xsel` on X11, when
+  installed (optional dependencies `wl-clipboard` and `xclip`); else
+  OSC 52, which works over SSH but not in VTE terminals.
 - **Media opening:** `xdg-open` by default, or per-MIME openers from the
   config.
 - **Secret Service:** not used in v1. It may hold the key if app-level

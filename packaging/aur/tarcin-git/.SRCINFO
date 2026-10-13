@@ -11,7 +11,9 @@ pkgbase = tarcin-git
 	makedepends = scdoc
 	depends = glibc
 	depends = sqlite
-	optdepends = xdg-utils: open media with the default application
+	optdepends = xdg-utils: open media and links with the default application
+	optdepends = wl-clipboard: copy messages on Wayland
+	optdepends = xclip: copy messages on X11
 	provides = tarcin=0.0.0.r0.g0000000
 	conflicts = tarcin
 	options = !debug

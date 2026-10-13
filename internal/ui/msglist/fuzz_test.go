@@ -15,13 +15,26 @@ import (
 	"github.com/Yaman-yagiz/tarcin/internal/ui/uikit"
 )
 
-// sgr matches the styling the themes write; any other escape sequence
-// on screen came from content.
-var sgr = regexp.MustCompile("\x1b\\[[0-9;:]*m")
+// sgr matches the styling the themes write, and hyperlinkSeq the
+// hyperlinks the list writes around web addresses; any other escape
+// sequence on screen came from content.
+var (
+	sgr          = regexp.MustCompile("\x1b\\[[0-9;:]*m")
+	hyperlinkSeq = regexp.MustCompile("\x1b\\]8;(?:id=[0-9a-z-]*)?;([^\x07\x1b]*)\x07")
+)
 
 // screenProblem reports why a rendered line is unsafe, or "".
 func screenProblem(line string) string {
-	for _, r := range sgr.ReplaceAllString(line, "") {
+	line = sgr.ReplaceAllString(line, "")
+	for _, m := range hyperlinkSeq.FindAllStringSubmatch(line, -1) {
+		if m[1] == "" {
+			continue // the end of a link
+		}
+		if target, ok := linkTarget(m[1]); !ok || target != m[1] {
+			return fmt.Sprintf("hyperlink to %q, which is no safe address", m[1])
+		}
+	}
+	for _, r := range hyperlinkSeq.ReplaceAllString(line, "") {
 		switch {
 		case r < 0x20 || r == 0x7f:
 			return fmt.Sprintf("C0 control U+%04X", r)

@@ -821,6 +821,16 @@ func (p *pipeline) openMedia() func(domain.Message) tea.Cmd {
 	return func(msg domain.Message) tea.Cmd { return p.media.openMedia(msg) }
 }
 
+// openLink returns the ui.Options.OpenLink function: the web address
+// goes to the media opener (xdg-open by default), which hands it to the
+// browser.
+func (p *pipeline) openLink() func(string) tea.Cmd {
+	if p.opts.Media == nil {
+		return nil
+	}
+	return p.media.openLink
+}
+
 func (p *pipeline) saveMedia() func(domain.Message) tea.Cmd {
 	if p.opts.Media == nil {
 		return nil

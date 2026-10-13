@@ -608,7 +608,7 @@ func (m *Model) action(a keymap.Action) tea.Cmd {
 	case keymap.JumpQuoted:
 		return m.jumpQuoted()
 	case keymap.Reply, keymap.React, keymap.Edit, keymap.Delete, keymap.Copy,
-		keymap.OpenMedia, keymap.SaveMedia, keymap.ViewPager, keymap.Retry, keymap.Forward:
+		keymap.OpenMedia, keymap.SaveMedia, keymap.ViewPager, keymap.Retry, keymap.Forward, keymap.OpenLink:
 		if i, ok := m.idx[m.selected]; ok {
 			msg := m.win[i]
 			return func() tea.Msg { return MessageActionMsg{Action: a, Message: msg} }

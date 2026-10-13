@@ -61,7 +61,19 @@ Select a message with `j` and `k`, then:
 | `v` | read the text in `$PAGER` |
 | `o` / `s` | open / save the media |
 | `gq` | jump to the quoted message |
+| `gx` | open a link in the message in your browser; again, the next one |
 | `ctrl+r` | send a failed message again |
+
+## Links and copying
+
+Web addresses in messages are links: a click (in most terminals with
+ctrl held) opens the whole address, even where it breaks over lines.
+`gx` opens the selected message's link from the keyboard.
+
+`y` copies a message's text with `wl-copy` on Wayland, or `xclip` or
+`xsel` on X11. Without one of them, tarcin asks the terminal (OSC 52),
+which works over SSH but which GNOME Console and GNOME Terminal ignore:
+install `wl-clipboard` (or `xclip`) to copy there.
 
 ## Media
 

@@ -19,6 +19,7 @@ import (
 
 	"github.com/Yaman-yagiz/tarcin/internal/domain"
 	"github.com/Yaman-yagiz/tarcin/internal/ui/chatlist"
+	"github.com/Yaman-yagiz/tarcin/internal/ui/clipboard"
 	"github.com/Yaman-yagiz/tarcin/internal/ui/composer"
 	"github.com/Yaman-yagiz/tarcin/internal/ui/keymap"
 	"github.com/Yaman-yagiz/tarcin/internal/ui/linkscreen"
@@ -106,6 +107,9 @@ type Options struct {
 	// so. Nil disables them.
 	OpenMedia func(msg domain.Message) tea.Cmd
 	SaveMedia func(msg domain.Message) tea.Cmd
+	// OpenLink opens a web address in the browser; it returns the
+	// command that does so. Nil disables it.
+	OpenLink func(url string) tea.Cmd
 	// Typing tells a chat whether this account types in it, and Presence
 	// tells contacts whether it is online; each returns the command that
 	// does so. Nil, as the privacy settings may make them, sends nothing.
@@ -199,7 +203,12 @@ type Model struct {
 	attentionFn              func(bool) tea.Cmd
 	notifyFocused            bool
 	startChatFn              func(string) tea.Cmd
-	choices                  string // a completion's matches, shown beside the command line
+	choices                  string               // a completion's matches, shown beside the command line
+	copyFn                   func(string) tea.Cmd // clipboard.Copy; a test seam
+	openLinkFn               func(string) tea.Cmd
+	linkHint                 string    // the key that opens a link, for the status line
+	nextLink                 linkCycle // which of a message's links the key opens next
+	hasLinks                 linkCache // whether the selected message has links
 	contactsFn               func(string) tea.Cmd
 	saveMediaFn              func(domain.Message) tea.Cmd
 	presenceFn               func(bool) tea.Cmd
@@ -238,7 +247,7 @@ func New(opts Options) *Model {
 	}
 	ctx := uikit.NewContext(t)
 	var quitKeys []string // single keys that quit, for screens without the matcher
-	quitHint, openKey, saveKey := "", "", ""
+	quitHint, openKey, saveKey, linkKey := "", "", "", ""
 	for _, b := range km.Bindings() {
 		switch b.Action {
 		case keymap.Quit:
@@ -255,6 +264,10 @@ func New(opts Options) *Model {
 		case keymap.SaveMedia:
 			if saveKey == "" {
 				saveKey = b.String()
+			}
+		case keymap.OpenLink:
+			if linkKey == "" {
+				linkKey = b.String()
 			}
 		}
 	}
@@ -288,6 +301,7 @@ func New(opts Options) *Model {
 		retry:          opts.Retry,
 		forwardFn:      opts.Forward,
 		mediaHint:      strings.Join(mediaHint, " · "),
+		linkHint:       map[bool]string{true: linkKey + " open link"}[linkKey != ""],
 		getenv:         os.Getenv,
 		reconnect:      opts.Reconnect,
 		linkOpts:       opts.Link,
@@ -302,6 +316,8 @@ func New(opts Options) *Model {
 		attachFn:       opts.Attach,
 		notifyFn:       opts.Notify,
 		attentionFn:    opts.Attention,
+		copyFn:         clipboard.Copy,
+		openLinkFn:     opts.OpenLink,
 		notifyFocused:  opts.NotifyFocused,
 		startChatFn:    opts.StartChat,
 		contactsFn:     opts.Contacts,
@@ -428,6 +444,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ContactsMsg:
 		m.completedContacts(msg)
 		return m, nil
+	case clipboard.ResultMsg:
+		m.copied(msg)
+		return m, nil
 	case ChatStartedMsg:
 		cmd := m.chatStarted(msg)
 		return m, cmd
@@ -522,6 +541,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		case keymap.OpenMedia, keymap.SaveMedia:
 			cmd := m.mediaAction(msg.Action, &msg.Message)
+			return m, cmd
+		case keymap.OpenLink:
+			cmd := m.openLink(&msg.Message)
 			return m, cmd
 		}
 		if msg.Action == keymap.Retry && m.retry != nil {

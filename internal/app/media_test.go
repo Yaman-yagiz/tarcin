@@ -557,3 +557,16 @@ func TestCachePathStaysInTheCache(t *testing.T) {
 		}
 	}
 }
+
+func TestOpenLinkUsesTheOpener(t *testing.T) {
+	var ran []string
+	h := &mediaHandler{o: mediaOptions{Open: []string{"xdg-open"}, start: func(argv []string) error { ran = argv; return nil }}}
+	msg, ok := h.openLink("https://a.example/1")().(ui.BatchMsg)
+	if !ok || !slices.Equal(ran, []string{"xdg-open", "https://a.example/1"}) || !strings.Contains(msg.Notice, "Opened the link") {
+		t.Fatalf("ran %q, msg %#v", ran, msg)
+	}
+	h.o.start = func([]string) error { return errors.New("no such file") }
+	if msg := h.openLink("https://a.example/1")().(ui.BatchMsg); !strings.Contains(msg.Notice, "Could not open") {
+		t.Fatalf("msg %#v", msg)
+	}
+}

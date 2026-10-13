@@ -13,7 +13,10 @@ SQLite. The release package checks the release's PGP signature.
 
 Optional dependencies:
 
-- `xdg-utils`, to open media with your default applications;
+- `xdg-utils`, to open media and links with your default applications;
+- `wl-clipboard` (Wayland) or `xclip` (X11), for `y` to copy a message:
+  GNOME Console and GNOME Terminal do not let a program copy through
+  the terminal;
 - a notification daemon (`dunst`, `mako` or your desktop's own) for
   desktop notifications. Without one, tarcin rings the terminal bell.
 

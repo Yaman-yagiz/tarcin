@@ -346,11 +346,12 @@ func (m *Model) bodyLines(msg *domain.Message, width int) []string {
 	}
 
 	var lines []string
-	for _, para := range strings.Split(text, "\n") {
+	for i, para := range strings.Split(text, "\n") {
 		if para == "" {
 			lines = append(lines, "")
 		} else {
-			lines = append(lines, wrap(method, para, width)...)
+			id := "m" + strconv.FormatInt(int64(msg.ID), 10) + "p" + strconv.Itoa(i)
+			lines = append(lines, linkify(para, wrap(method, para, width), id)...)
 		}
 		if len(lines) > maxBodyLines {
 			break

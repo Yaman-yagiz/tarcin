@@ -19,6 +19,7 @@ import (
 
 	"github.com/Yaman-yagiz/tarcin/internal/domain"
 	"github.com/Yaman-yagiz/tarcin/internal/sanitize"
+	"github.com/Yaman-yagiz/tarcin/internal/ui/clipboard"
 	"github.com/Yaman-yagiz/tarcin/internal/ui/uikit"
 )
 
@@ -216,7 +217,7 @@ func (m *Model) key(k tea.KeyPressMsg) tea.Cmd {
 	case stepPasskey:
 		switch key {
 		case "ctrl+y":
-			return tea.SetClipboard(m.snippet())
+			return clipboard.Copy(m.snippet())
 		case "enter":
 			resp := strings.TrimSpace(m.input.Value())
 			if resp == "" || m.opts.SubmitPasskey == nil {

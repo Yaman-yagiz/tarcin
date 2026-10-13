@@ -154,6 +154,7 @@ contexts, their actions and the defaults:
 *edit* = ["e"]++
 *forward* = ["f"]++
 *jump-quoted* = ["gq"]++
+*open-link* = ["gx"]++
 *open-media* = ["o"]++
 *react* = ["r"]++
 *reply* = ["R"]++

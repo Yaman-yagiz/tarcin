@@ -98,6 +98,7 @@ it. How to report vulnerabilities is described in
 5. **Atomic writes.** Data goes to a temp file in the same directory, is
    `fsync`ed, and is then renamed into place.
 6. **No shell.** External programs (`$EDITOR`, `$PAGER`, `xdg-open`,
+   the clipboard programs,
    openers) are run with `exec.Command(name, args...)`. Message content
    is never interpolated into a shell string.
 7. **SQL is always parameterised.** DSNs are built with `net/url`.
@@ -133,6 +134,11 @@ it. How to report vulnerabilities is described in
     from a member's message, and a direct chat accepts only the timers
     WhatsApp offers. Only this account's own devices can mark a chat
     read for it.
+14. **Links show where they lead.** Web addresses become OSC 8
+    hyperlinks only to the address their text shows: http or https, an
+    ASCII host, no user name, at most 2 KiB. No message can make other
+    text, a look-alike host or a `file:` or `javascript:` address
+    clickable, and `gx` hands the browser only such addresses.
 
 ## 5. Controls: logging and diagnostics
 

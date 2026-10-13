@@ -16,6 +16,7 @@ import (
 	"github.com/Yaman-yagiz/tarcin/internal/domain"
 	"github.com/Yaman-yagiz/tarcin/internal/sanitize"
 	"github.com/Yaman-yagiz/tarcin/internal/ui/chatlist"
+	"github.com/Yaman-yagiz/tarcin/internal/ui/clipboard"
 	"github.com/Yaman-yagiz/tarcin/internal/ui/keymap"
 	"github.com/Yaman-yagiz/tarcin/internal/ui/msglist"
 )
@@ -23,13 +24,28 @@ import (
 func TestCopyMessage(t *testing.T) {
 	m := New(Options{History: emptyHistory{}})
 	size(m, 120, 30)
+	var copied []string
+	tool := "wl-copy"
+	m.copyFn = func(text string) tea.Cmd { // never the real clipboard
+		copied = append(copied, text)
+		return func() tea.Msg { return clipboard.ResultMsg{Tool: tool} }
+	}
 	msg := domain.Message{ID: 1, ChatID: 1, WAID: "W1", Kind: domain.KindText, Body: "selam \u202edünya\nikinci satır"}
 	_, cmd := m.Update(msglist.MessageActionMsg{Action: keymap.Copy, Message: msg})
-	if cmd == nil || !reflect.DeepEqual(cmd(), tea.SetClipboard(sanitize.Text(msg.Body))()) {
-		t.Fatal("y copies the text as shown, with the bidi control made visible")
+	runCmd(m, cmd)
+	if !reflect.DeepEqual(copied, []string{sanitize.Text(msg.Body)}) {
+		t.Fatalf("y copies the text as shown, with the bidi control made visible: %q", copied)
 	}
-	if !strings.Contains(statusOf(m), "Copied") {
-		t.Fatalf("status %q", statusOf(m))
+	if s := statusOf(m); !strings.Contains(s, "Copied") || strings.Contains(s, "OSC 52") {
+		t.Fatalf("status %q", s)
+	}
+	// Without a clipboard program, the terminal is asked, and the status
+	// says what to install.
+	tool = ""
+	_, cmd = m.Update(msglist.MessageActionMsg{Action: keymap.Copy, Message: msg})
+	runCmd(m, cmd)
+	if s := statusOf(m); !strings.Contains(s, "OSC 52") || !strings.Contains(s, "wl-clipboard") {
+		t.Fatalf("status %q", s)
 	}
 	for _, none := range []domain.Message{
 		{ID: 2, WAID: "W2", Kind: domain.KindImage},
@@ -96,5 +112,49 @@ func TestStatusLineNamesTheMediaKeys(t *testing.T) {
 	m.Update(key("k"))
 	if st := statusOf(m); strings.Contains(st, "o open") {
 		t.Fatalf("status %q: a text message is selected", st)
+	}
+}
+
+// TestOpenLink: gx opens a message's links one after another, and the
+// status line names the key while a message with a link is selected.
+func TestOpenLink(t *testing.T) {
+	now := time.Now()
+	hist := genHistory{1: {
+		{ID: 1, ChatID: 1, WAID: "T", SenderID: 2, Kind: domain.KindText, Body: "no link here", Timestamp: now.Add(-time.Minute)},
+		{ID: 2, ChatID: 1, WAID: "L", SenderID: 2, Kind: domain.KindText, Timestamp: now,
+			Body: "bak https://a.example/1 ve www.b.example/2."},
+	}}
+	var opened []string
+	m := New(Options{History: hist, OpenLink: func(u string) tea.Cmd { opened = append(opened, u); return nil }})
+	size(m, 120, 30)
+	m.Update(chatlist.LoadMsg{Rows: []chatlist.Row{{ID: 1, Title: "Aile", LastActivity: now}}})
+	_, open := m.Update(key("enter"))
+	runCmd(m, open)
+	if m.Focus() != FocusMessages {
+		m.Update(key("tab"))
+	}
+	if st := statusOf(m); !strings.Contains(st, "g x open link") {
+		t.Fatalf("status %q: a message with a link is selected", st)
+	}
+	gx := func() {
+		for _, k := range []string{"g", "x"} {
+			_, cmd := m.Update(key(k))
+			runCmd(m, cmd)
+		}
+	}
+	for range 3 {
+		gx()
+	}
+	want := []string{"https://a.example/1", "https://www.b.example/2", "https://a.example/1"}
+	if !reflect.DeepEqual(opened, want) {
+		t.Fatalf("opened %q, want %q", opened, want)
+	}
+	m.Update(key("k"))
+	if st := statusOf(m); strings.Contains(st, "open link") {
+		t.Fatalf("status %q: a message without a link is selected", st)
+	}
+	gx()
+	if st := statusOf(m); !strings.Contains(st, "no link") || len(opened) != 3 {
+		t.Fatalf("status %q, opened %q", st, opened)
 	}
 }
