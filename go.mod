@@ -10,7 +10,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/mattn/go-sqlite3 v1.14.52
-	go.mau.fi/whatsmeow v0.0.0-20260927171547-45cfce066cd2
+	go.mau.fi/whatsmeow v0.0.0-20261005123207-68df7a5ec7b5
 	golang.org/x/sys v0.48.0
 	golang.org/x/text v0.42.0
 	google.golang.org/protobuf v1.36.12
