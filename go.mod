@@ -10,9 +10,9 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/mattn/go-sqlite3 v1.14.52
-	go.mau.fi/whatsmeow v0.0.0-20260927171547-45cfce066cd2
-	golang.org/x/sys v0.48.0
-	golang.org/x/text v0.42.0
+	go.mau.fi/whatsmeow v0.0.0-20261026160329-fe2dd4f15c24
+	golang.org/x/sys v0.49.0
+	golang.org/x/text v0.43.0
 	google.golang.org/protobuf v1.36.12
 	rsc.io/qr v0.2.0
 )
@@ -36,15 +36,15 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.27 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/petermattis/goid v0.0.0-20260820044319-269ab09b5261 // indirect
+	github.com/petermattis/goid v0.0.0-20260918085751-abfca077860b // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rs/zerolog v1.35.1 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.27 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.mau.fi/libsignal v0.2.2 // indirect
-	go.mau.fi/util v0.10.1 // indirect
-	golang.org/x/crypto v0.57.0 // indirect
-	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
-	golang.org/x/net v0.60.0 // indirect
-	golang.org/x/sync v0.23.0 // indirect
+	go.mau.fi/util v0.11.0 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
+	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
+	golang.org/x/net v0.61.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
 )
